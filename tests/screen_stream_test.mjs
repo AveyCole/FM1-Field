@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {decodeFrame,applyFrame} from '../docs/mirror/pixels.mjs';
 const root=new URL('../app/build/tests/',import.meta.url);
-for(const name of ['sampler','player','effects']) {
+for(const name of ['sampler','player','effects','filter']) {
   const raw=fs.readFileSync(new URL(`${name}.syx`,root)),fb=new Uint16Array(240*240);let start=-1,frames=0;
   for(let i=0;i<raw.length;i++){
     if(raw[i]===0xf0)start=i;

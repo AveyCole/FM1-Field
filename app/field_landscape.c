@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 /* Still landscape, drawn in the existing canvas strips. No sample decoding or
  * animation in the UI; held keyboard notes do not change this artwork. */
-static void ui_landscape(void)
+static void ui_landscape(int river)
 {
     unsigned band;int x,y;
-    if(w_eq(ui_key[2],"landscape")) return;
-    w_cpy(ui_key[2],"landscape",UI_KEY);
+    const char *key=river?"river":"landscape";
+    if(w_eq(ui_key[2],key)) return;
+    w_cpy(ui_key[2],key,UI_KEY);
     for(band=0;band<3;band++) {
         int top=(int)band*26;
         cv_begin(240,26,K_BG);
@@ -18,9 +19,14 @@ static void ui_landscape(void)
             if(yy>=far) color=K_LINE;
             if(yy>=near) color=K_PANEL;
             /* A quiet cream river widens toward the foreground. */
-            if(yy>=59) {
+            if(!river && yy>=59) {
                 int center=127+(yy-59)*(yy-59)/75,half=1+(yy-59)/7;
                 if(x>=center-half && x<=center+half) color=K_DIM;
+            }
+            if(river && yy>=48) {
+                int t=yy-48,center=115+(t<20?-t/2:(t-20)*(t-20)/24-10),half=2+t/3;
+                if(x>=center-half-1 && x<=center+half+1) color=K_CORAL;
+                if(x>=center-half && x<=center+half) color=yy%12==0?K_TEXT:K_DIM;
             }
             cv_rect(x,y,1,1,color);
         }
@@ -35,10 +41,9 @@ static void ui_landscape(void)
         cv_blit(0,90+(unsigned)top);
     }
 }
-static void ui_sample_knobs(const char *a,const char *b,const char *c,const char *d)
+static void ui_knobs(const char *const *labels,const char *a,const char *b,const char *c,const char *d)
 {
     const char *values[4]={a,b,c,d};
-    static const char *const labels[4]={"K1 START","K2 END","K3 PITCH","K4 LEVEL"};
     char key[UI_KEY];unsigned i;
     snprintf(key,sizeof key,"%.12s|%.12s|%.12s|%.12s",a,b,c,d);
     if(w_eq(ui_key[3],key)) return;

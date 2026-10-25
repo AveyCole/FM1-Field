@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.8-alpha](docs/firmware/field-0.1.8-alpha.fwsc)**
+[Download 0.1.9-alpha](docs/firmware/field-0.1.9-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.8 update adds a quiet sampler landscape, live monitoring with an ALGORITHM mute switch, repaired FX tap tempo with visible BPM, and an optional USB display viewer. It retains the streaming reserve and USB recovery work. Software checks pass; physical-device testing is still needed.
+The 0.1.9 update adds a stereo filter with LFO modulation behind LFO, a river scene with compact knob readouts, and selectable sampler slice counts. Software checks pass; physical-device testing is still needed.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
@@ -39,6 +39,8 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | MASTER | Volume |
 | Keys | Play the captured sample on the player and in ARP; hold white keys for FX in ENV |
 | ARP | Sample editor: REC capture, PLAY audition, SEL cycles one shot / loop hold / loop latch / slice; K1 start, K2 end, K3 pitch, K4 level |
+| PRESETS in ARP Slice | Select 4, 8, 16 or 27 equal slices of the trimmed clip; fewer slices are longer |
+| LFO | Open the filter page; press again or HOME to return to the player |
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
 | FX | Tap tempo on any page; ENV displays BPM and the FX light marks the beat |
 | ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
@@ -54,7 +56,10 @@ It survives returning to the main screen, changing recordings, and reopening ARP
 REC again stops capture early; otherwise it stops at capacity. ARP's OCT buttons
 transpose; keys use C4 as the original pitch. In Loop hold, releasing the triggering key stops playback. Loop latch keeps
 playing after release and across screens; tap its key again or PLAY in ARP to stop.
-Slice divides the trimmed range into 27 equal sections, one per key, at a common pitch.
+Slice divides the trimmed range into 4, 8, 16 or 27 equal sections at a common
+pitch. PRESETS selects the count while in Slice mode; higher keys repeat the
+sequence when fewer than 27 slices are selected. It starts at 27 on boot.
+Changing the count stops the current sample voice and retains the clip.
 SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving ARP finishes capture.
 The live recording stays audible in ARP by default. Turn ALGORITHM left to mute
 its monitor and right to restore it. This switch does not mute the sample or
@@ -81,6 +86,22 @@ ports before taking USB ownership. Compressed audio and PCM buffers retain
 their previous sizes.
 
 ![FIELD sampler](docs/images/field-sampler.png)
+
+LFO opens an independent stereo filter after the live/sample mix. The filter
+starts off at boot and activates on its first visit; it stays active when leaving
+the page. ALGORITHM left bypasses it, right enables it. Its state is temporary.
+K1 sets cutoff (80–6,000 Hz), K2 resonance, K3 modulation depth (zero gives a
+manual filter), and K4/SELECT speed. SEL cycles low-pass, high-pass, band-pass.
+EDIT toggles free speed (0.05–8 Hz) / sync (8, 4, 2, 1, 1/2, 1/4 beats per cycle).
+FX on this page enables sync and taps tempo; other FX taps update the shared
+tempo too. The header shows BPM. The static river scene and compact readouts
+match the sampler. Filter bypass and cutoff/resonance changes are smoothed.
+Samples remain playable on this page; OCT skips within the current region,
+REC saves favorites, ARP opens the sampler, ENV opens the separate live FX.
+Capture remains before the filter, so the captured source stays dry. The filter
+needs a small amount of state and shares no sample/FX audio memory.
+
+![FIELD river filter](docs/images/field-filter.png)
 
 Near is anchored when EDIT enables it and survives power-off. It does not drift
 with each skip. Its first selection scans the location index, potentially taking
@@ -110,10 +131,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.8-alpha
+  python3 base/tools/build.py app --release 0.1.9-alpha
 ```
 
-This produces `app/build/field-0.1.8-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.9-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

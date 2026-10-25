@@ -1,0 +1,89 @@
+wait 6000
+expect fil_on 0
+tap ARP
+tap REC
+wait 3000
+expect sam_state 2
+tap LFO
+expect page 10
+expect fil_on 1
+expect sam_state 2
+expect sam_len 21824
+turn K1 -10
+turn K2 10
+turn K3 16
+expect fil_depth 32
+turn K4 8
+expect fil_rate 80
+shot field-filter-free.png
+tap SEL
+expect fil_type 1
+tap SEL
+expect fil_type 2
+tap SEL
+expect fil_type 0
+tap FX
+expect fil_sync 1
+wait 2500
+press FX
+release FX
+wait 746
+press FX
+release FX
+expect tempo_bpm 80
+wait 120
+shot field-filter-sync.png
+tap EDIT
+expect fil_sync 0
+turn ALGO -1
+expect fil_on 0
+tap LFO
+expect page 0
+tap LFO
+expect fil_on 0
+turn ALGO 1
+expect fil_on 1
+tap OCT+
+wait 400
+expect page 10
+expect ap_sound 2
+expect sam_len 21824
+key 7 down
+wait 40
+expect sam_voice 1
+key 7 up
+tap ARP
+expect page 6
+tap SEL
+tap SEL
+tap SEL
+expect sam_loop 3
+expect sam_slices 27
+turn PRESET -1
+expect sam_slices 16
+turn PRESET -1
+expect sam_slices 8
+turn PRESET -1
+expect sam_slices 4
+turn PRESET -1
+expect sam_slices 4
+key 26 down
+wait 40
+expect sam_slice 2
+key 26 up
+shot field-sampler-four-slices.png
+turn PRESET 1
+expect sam_slices 8
+turn PRESET 1
+expect sam_slices 16
+turn PRESET 1
+expect sam_slices 27
+tap HOME
+tap LFO
+expect fil_on 1
+tap ENV
+expect page 9
+expect sam_state 0
+key w4 down
+wait 100
+key w4 up

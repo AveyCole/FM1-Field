@@ -18,6 +18,12 @@ screen on effects.syx
 wait 3000
 fbdump effects.rgb
 screen off
+tap LFO
+screen on filter.syx
+wait 3000
+fbdump filter.rgb
+screen off
+tap LFO
 screen_mem 8000
 screen on low-memory.syx
 expect screen_on 0

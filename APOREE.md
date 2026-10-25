@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.8-alpha
+# FIELD — experimental 0.1.9-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.8-alpha
+  python3 base/tools/build.py app --release 0.1.9-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -405,3 +405,45 @@ retries, memory refusal and heartbeat timeout. Viewer tests cover subscription,
 rendering and releasing native ports for installation. Streaming crypto and
 scheduler, updater recovery and real-loader flash safety regressions pass.
 Build checks: image 578560 B; RAM .data+.bss 130656 B of 131072; pool 308884 B of 311296. Hardware behavior is not yet confirmed.
+
+## River filter and selectable slice count (0.1.9)
+
+LFO opens an independent stereo state-variable filter after the mixed live
+recording and sampler voice. It activates on first opening and remains enabled
+across navigation; ALGORITHM left bypasses, right enables. No sample/FX history
+is borrowed, and entering it preserves the clip. Capture precedes the filter.
+Settings are temporary and the filter starts bypassed after boot.
+
+K1 cutoff spans 80–6,000 Hz, K2 resonance, K3 triangle LFO depth up to ±3 octaves,
+and K4/SELECT speed. A zero depth is a manual filter. SEL cycles low-pass,
+high-pass, band-pass; EDIT toggles free 0.05–8 Hz and synced periods of 8, 4, 2,
+1, 1/2 or 1/4 beats. FX tapping on the page enables sync and resets LFO phase;
+all tempo taps update the shared beat. The page shows BPM, filter type, bypass,
+free/sync, a static original river/forest scene and four compact knob readouts.
+The sampler's artwork stays intact; shared drawing code avoids duplicate assets.
+HOME/LFO returns to the player without bypassing. The sample keyboard, region
+skip on OCT, favorites on REC/SEQ, ARP and ENV remain accessible.
+
+Coefficients update every 64 samples; cutoff/resonance are smoothed there and
+bypass crossfades over 220 audio samples. The cutoff ceiling and damping range
+are bounded inside the Chamberlin stability region. The mixed output is bounded
+before conversion to the audio word. No PCM or network buffer is reduced.
+
+In ARP Slice, PRESETS selects 4, 8, 16 or 27 contiguous equal portions of the
+trimmed clip. Fewer sections give longer samples. The header shows the count;
+keys beyond the count repeat the sequence. Count changes stop the current voice
+and preserve capture, trim and tuning. Default is 27 after boot. Other sampler
+modes retain their behavior, and PRESETS has no new meaning outside Slice.
+
+Tests cover LP/HP frequency separation, band-pass response, independent stereo
+state, exact bypass, modulation/tempo scaling and 96 corner combinations of
+type, cutoff, resonance, depth, sync and speed for finite bounded state/output.
+Sampler tests verify every slice boundary covers the trimmed range exactly and
+all 27 keys map within bounds at each count. Host tests cover page controls,
+preserved samples, navigation, bypass, 80 BPM sync, all slice counts and wraps.
+The actual viewer decoder reconstructs every filter-screen pixel, alongside
+player/sampler/FX screens. Existing sampler, monitor, favorites, USB updater,
+stream crypto and scheduler checks pass. Loader simulation checks the exact
+package, writes only permitted flash windows, preserves the flash head and
+refuses damage. Build checks: image 581328 B; RAM .data+.bss 130688 B of 131072; pool 308884 B of 311296.
+Physical-device audio, CPU timing and USB behavior still require testing.

@@ -12,6 +12,7 @@ static volatile uint8_t sam_muted;
 static float sam_monitor_level=1;
 static volatile uint32_t sam_len;
 static uint8_t sam_start,sam_end=127,sam_level=110,sam_loop,sam_div,sam_slice;
+static uint8_t sam_slices=27;
 static int8_t sam_pitch,sam_oct;
 static int sam_pred,sam_index;
 static uint32_t sam_tick,sam_cached=0xFFFFFFFFu;
@@ -63,7 +64,7 @@ static int sam_sample(unsigned pos)
 static void sam_init(void *buffer)
 {
  sam_data=buffer;sam_state=SAM_EMPTY;sam_len=0;sam_voice=sam_gate=0;sam_active=0;
- sam_muted=0;sam_monitor_level=1;
+ sam_muted=0;sam_monitor_level=1;sam_slices=27;
 }
 static void sam_monitor(float *l,float *r)
 {
@@ -118,16 +119,16 @@ static unsigned sam_trim_last(void)
 static unsigned sam_first(void)
 {
  unsigned first=sam_trim_first();
- return sam_loop==3?first+(sam_trim_last()-first)*sam_slice/27u:first;
+ return sam_loop==3?first+(sam_trim_last()-first)*sam_slice/sam_slices:first;
 }
 static unsigned sam_last(void)
 {
  unsigned first=sam_trim_first(),last=sam_trim_last();
- return sam_loop==3?first+(last-first)*(sam_slice+1u)/27u:last;
+ return sam_loop==3?first+(last-first)*(sam_slice+1u)/sam_slices:last;
 }
 static void sam_note(int note)
 {
- if(sam_loop==3) sam_slice=(uint8_t)(note<53?0:note>79?26:note-53);
+ if(sam_loop==3) sam_slice=(uint8_t)(note<53?0:note>79?26:note-53)%sam_slices;
  if(sam_state!=SAM_READY || sam_len<64 || sam_first()+2u>sam_last()) return;
  sam_voice=0;sam_pos=(float)sam_first();sam_env=0;
  sam_step=((float)SAM_RATE/44100.0f)*fm_exp2f((float)((sam_loop==3?0:note-60)+sam_pitch+12*sam_oct)/12.0f);

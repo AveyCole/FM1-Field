@@ -500,6 +500,7 @@ static void fx_process(float *l, float *r)
     }
 }
 
+#include "field_filter.c"
 /* the audio interrupt's: n frames into o (24-bit in 32, stereo) */
 static void radio_render(int32_t *o, uint32_t n)
 {
@@ -535,6 +536,7 @@ static void radio_render(int32_t *o, uint32_t n)
             l = fm_clampf(l + sy, -1.0f, 1.0f);
             rr = fm_clampf(rr + sy, -1.0f, 1.0f);
         }
+        fil_process(&l,&rr);
         o[2u * i] = (int32_t)(l * gain);
         o[2u * i + 1u] = (int32_t)(rr * gain);
     }

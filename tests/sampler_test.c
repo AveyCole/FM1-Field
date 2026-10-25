@@ -42,7 +42,14 @@ int main(void)
     assert(end==SAM_FRAMES);
     sam_start=32;sam_end=110;end=sam_trim_first();
     for(i=0;i<27;i++) {sam_note(53+(int)i);assert(sam_first()==end);end=sam_last();}
-    assert(end==sam_trim_last());sam_start=0;sam_end=127;sam_loop=0;
+    assert(end==sam_trim_last());
+    for(unsigned count=4;count<=16;count*=2) {
+        sam_slices=(uint8_t)count;end=sam_trim_first();
+        for(i=0;i<count;i++) {sam_note(53+(int)i);assert(sam_first()==end);end=sam_last();assert(end>sam_first());}
+        assert(end==sam_trim_last());
+        for(i=0;i<27;i++) {sam_note(53+(int)i);assert(sam_slice==i%count);assert(sam_first()>=sam_trim_first() && sam_last()<=sam_trim_last());}
+    }
+    sam_slices=27;sam_start=0;sam_end=127;sam_loop=0;
     sam_enter();sam_record();for(i=0;i<4410;i++) sam_capture(0.1f,0.1f,1);
     sam_record();assert(sam_state==SAM_READY && sam_len==800);
     sam_start=125;sam_end=126;sam_note(60);
