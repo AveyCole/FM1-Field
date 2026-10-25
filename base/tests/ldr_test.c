@@ -136,7 +136,7 @@ int main(int argc, char **argv)
 {
     size_t olen;
     uint8_t *old, head[0x4000];
-    static uint8_t sample_banks[0x8000];
+    static uint8_t sample_banks[0x21000];
     uint32_t ofo, nfo;
     int bad = 0, rc;
     if (argc < 3) { printf("usage: ldr_test OLD.fwsc NEW.fwsc\n"); return 2; }
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
     bad += check("finish asked (0xF0000000)", f0_asked >= 1);
     bad += check("update record cleared (RAM + flash)", record_cleared && nor[0xE4F06] == 0xFF);
     bad += check("no write outside the allowed windows", bad_range == 0);
-    bad += check("saved sample banks unchanged (including AT-like data)", !memcmp(sample_banks,nor+0x97000,sizeof sample_banks));
+    bad += check("saved sample/cache banks unchanged (including AT-like data)", !memcmp(sample_banks,nor+0x97000,sizeof sample_banks));
     /* same package again: nothing to erase */
     erases = 0; requests = 0;
     rc = ldr_session();

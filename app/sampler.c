@@ -1,15 +1,15 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 /* One 8/4/2 kHz mono IMA ADPCM clip in the former 12 KiB FX buffer.
  * Independent 64-sample blocks support pitched playback with a tiny cache. */
-#define SAM_BYTES 12288u
+#define SAM_BYTES 24576u
 #define SAM_BLOCK 36u
 #define SAM_FRAMES ((SAM_BYTES/SAM_BLOCK)*64u)
-#define SAM_RATE 8000u
+#define SAM_RATE 16000u
 enum {SAM_EMPTY,SAM_CAPTURE,SAM_READY};
 static uint8_t *sam_data;
 static volatile uint8_t sam_active,sam_state,sam_voice,sam_gate;
 static volatile uint8_t sam_muted;
-static uint8_t sam_quality,sam_rate_shift;
+static uint8_t sam_quality=1,sam_rate_shift=1,sam_live_mix=127;
 static unsigned sam_rate(void) {return SAM_RATE>>sam_rate_shift;}
 static uint8_t sam_layer,sam_dubbing,sam_dub_fresh,sam_dub_block[SAM_BLOCK];
 static uint32_t sam_dub_pos;
@@ -72,11 +72,11 @@ static void sam_init(void *buffer)
  sam_data=buffer;sam_state=SAM_EMPTY;sam_len=0;sam_voice=sam_gate=0;sam_active=0;
  sam_muted=0;sam_monitor_level=1;sam_slices=27;
  sam_layer=sam_dubbing=0;sam_dub_pos=0;sam_dub_old=sam_dub_monitor=0;
- sam_quality=sam_rate_shift=0;
+ sam_quality=sam_rate_shift=1;sam_live_mix=127;
 }
 static void sam_monitor(float *l,float *r)
 {
- float target=sam_active && sam_muted?0.0f:1.0f;
+ float target=sam_active?(sam_muted?0.0f:(float)sam_live_mix/127.0f):1.0f;
  if(sam_monitor_level<target) sam_monitor_level=fm_minf(target,sam_monitor_level+1.0f/220.0f);
  else if(sam_monitor_level>target) sam_monitor_level=fm_maxf(target,sam_monitor_level-1.0f/220.0f);
  *l*=sam_monitor_level;*r*=sam_monitor_level;
@@ -183,7 +183,7 @@ static float sam_next(void)
  if(sam_state==SAM_CAPTURE && sam_dubbing) {
   sam_dub_monitor+=0.25f*((sam_dub_fresh?sam_dub_old:0)-sam_dub_monitor);
   edge=fm_minf(1.0f,fm_minf((float)sam_dub_pos,(float)(sam_len-sam_dub_pos))/24.0f);
-  return sam_dub_monitor*edge*(float)sam_level/127.0f;
+  return sam_dub_monitor*edge*(float)sam_level*(2.0f/127.0f);
  }
  if(!sam_voice || sam_state!=SAM_READY) return 0;
  first=sam_first();last=sam_last();
@@ -200,5 +200,5 @@ static float sam_next(void)
  if(sam_env<=0) {sam_env=0;sam_voice=0;return 0;}
  edge=fm_minf(1.0f,fm_minf((float)(i-first)+t,(float)(last-1u-i)-t)/24.0f);
  sam_fraction+=sam_step;i=(unsigned)sam_fraction;sam_position+=i;sam_fraction-=(float)i;
- return v*(1.0f/32768.0f)*sam_env*fm_maxf(edge,0)*(float)sam_level/127.0f;
+ return v*(1.0f/32768.0f)*sam_env*fm_maxf(edge,0)*(float)sam_level*(2.0f/127.0f);
 }

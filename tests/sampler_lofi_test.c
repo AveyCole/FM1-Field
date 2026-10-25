@@ -9,8 +9,8 @@
 static uint8_t guarded[SAM_BYTES+32];
 int main(void)
 {
- for(unsigned q=0;q<3;q++) {
-  unsigned rate=8000u>>q,i,frames=(SAM_FRAMES*44100u+rate-1u)/rate;
+ for(unsigned q=0;q<4;q++) {
+  unsigned rate=16000u>>q,i,frames=(SAM_FRAMES*44100u+rate-1u)/rate;
   memset(guarded,0x5A,sizeof guarded);sam_init(guarded+16);
   sam_quality=(uint8_t)q;sam_pitch=sam_oct=0;sam_start=0;sam_end=127;sam_loop=0;sam_record();
   assert(sam_rate()==rate);
@@ -24,7 +24,7 @@ int main(void)
    energy+=expected*expected;error+=delta*delta;
   }
   assert(10*log10(energy/error)>14);
-  sam_quality=(uint8_t)((q+1u)%3u); /* next capture choice cannot retune this clip */
+  sam_quality=(uint8_t)((q+1u)%4u); /* next capture choice cannot retune this clip */
   sam_note(60);assert(fabsf(sam_step*44100-(float)rate)<.001f);
   for(i=0;sam_voice && i<frames+3;i++) {float v=sam_next();assert(isfinite(v) && fabsf(v)<=1);}
   assert(!sam_voice && i>=frames && i<=frames+2);

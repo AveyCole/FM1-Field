@@ -12,7 +12,7 @@ int main(void)
     memset(guarded,0xA5,sizeof guarded);sam_init(guarded+16);sam_enter();sam_record();
     for(i=0;i<44100;i++) sam_capture(0.5f,0.5f,0);
     assert(sam_len==0); /* stalls cannot create a silent sample */
-    for(i=0;i<44100*3;i++) {
+    for(i=0;i<44100*6;i++) {
         float v=(float)(0.45*sin(2*3.141592653589793*220*i/44100));
         sam_capture(v,v,1);
     }
@@ -36,7 +36,7 @@ int main(void)
         sam_note(53+(int)i);
         assert(sam_first()==end);end=sam_last();
         assert(sam_last()>sam_first());
-        for(unsigned j=0;j<6000;j++) assert(isfinite(sam_next()));
+        for(unsigned j=0;j<12000;j++) assert(isfinite(sam_next()));
         assert(!sam_voice); /* slices never loop and stay within their range */
     }
     assert(end==SAM_FRAMES);

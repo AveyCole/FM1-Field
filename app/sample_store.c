@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-/* One logical clip, two 16 KiB banks: erase/program inactive, commit last.
+/* One logical clip, two 32 KiB banks: erase/program inactive, commit last.
  * The FIELD region catalogue is compiled into code; this former place-table
  * space is unused. Neither bank overlaps settings, favorites or OTA staging. */
-#define CLIP_BASE 0x97000u
-#define CLIP_BANK 0x4000u
-#define CLIP_MAGIC 0x31504D53u
+#define CLIP_BASE 0xA0000u
+#define CLIP_BANK 0x8000u
+#define CLIP_MAGIC 0x32504D53u
+#define CLIP_OLD_MAGIC 0x31504D53u
 typedef struct {
  uint32_t magic,seq,len,crc;
  uint8_t start,end,level,loop,slices;
@@ -19,20 +20,22 @@ static uint32_t clip_crc(const void *data,unsigned n)
  return ~c;
 }
 static unsigned clip_bytes(unsigned frames) {return (frames+63u)/64u*SAM_BLOCK;}
-static const clip_header_t *clip_valid(unsigned bank)
+static const clip_header_t *clip_at(unsigned off,int legacy)
 {
- const uint8_t *p=plat_data(CLIP_BASE+bank*CLIP_BANK);const clip_header_t *h=(const void *)p;unsigned i;
- if(!p || h->magic!=CLIP_MAGIC || h->len<64 || h->len>SAM_FRAMES ||
+ const uint8_t *p=plat_data(off);const clip_header_t *h=(const void *)p;unsigned i;
+ if(!p || h->magic!=(legacy?CLIP_OLD_MAGIC:CLIP_MAGIC) || h->len<64 || h->len>(legacy?21824u:SAM_FRAMES) ||
     h->start>125 || h->end<=h->start || h->end>127 || h->level>127 || h->loop>3 ||
     (h->slices!=4 && h->slices!=8 && h->slices!=16 && h->slices!=27) ||
-    h->pitch < -24 || h->pitch>24 || h->oct < -2 || h->oct>2 || h->rate_shift>2 ||
+    h->pitch < -24 || h->pitch>24 || h->oct < -2 || h->oct>2 || h->rate_shift>(legacy?2:3) ||
     h->hcrc!=clip_crc(h,sizeof *h-4u) || h->crc!=clip_crc(p+64,clip_bytes(h->len))) return 0;
  for(i=0;i<clip_bytes(h->len);i+=SAM_BLOCK) if(p[64+i+2]>88) return 0;
  return h;
 }
+static const clip_header_t *clip_valid(unsigned bank) {return clip_at(CLIP_BASE+bank*CLIP_BANK,0);}
 static const clip_header_t *clip_current(void)
 {
  const clip_header_t *a=clip_valid(0),*b=clip_valid(1);
+ if(!a && !b) {a=clip_at(0x97000u,1);b=clip_at(0x9B000u,1);}
  return b && (!a || (int32_t)(b->seq-a->seq)>0)?b:a;
 }
 static int sam_restore(void)
@@ -43,7 +46,7 @@ static int sam_restore(void)
  memcpy(sam_data,(const uint8_t *)h+64,clip_bytes(h->len));
  sam_start=h->start;sam_end=h->end;sam_level=h->level;sam_loop=h->loop;sam_slices=h->slices;
  sam_pitch=h->pitch;sam_oct=h->oct;sam_slice=0;sam_cached=0xFFFFFFFFu;
- sam_quality=sam_rate_shift=h->rate_shift;
+ sam_quality=sam_rate_shift=(uint8_t)(h->rate_shift+(h->magic==CLIP_OLD_MAGIC));
  sam_len=h->len;sam_state=SAM_READY;return 1;
 }
 static int sam_save(void)

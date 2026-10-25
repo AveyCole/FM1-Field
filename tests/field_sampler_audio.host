@@ -2,7 +2,7 @@ wait 6000
 expect ap_playing 1
 tap ARP
 tap REC
-wait 3000
+wait 6000
 expect sam_state 2
 expect sam_voice 0
 peakreset
@@ -25,9 +25,9 @@ wait 300
 expect peak_db_max -120
 shot field-sampler-muted.png
 tap REC
-wait 3000
+wait 6000
 expect sam_state 2
-expect sam_len 21824
+expect sam_len 43648
 peakreset
 key 7 down
 wait 300

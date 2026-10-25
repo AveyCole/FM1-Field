@@ -363,16 +363,9 @@ static void ui_home(void)
         snprintf(line, sizeof line, "%s: trying again", radio_why), lc = K_CORAL;
     else
         w_cpy(line, "tuning...", sizeof line);
-    if (!fx_held && (int32_t)(tempo_shown_until - plat_ms()) > 0) {   /* just tapped: the tempo */
+    if ((int32_t)(tempo_shown_until - plat_ms()) > 0) {   /* just tapped: the tempo */
         snprintf(line, sizeof line, "tempo %u BPM", (unsigned)tempo_bpm);
         ui_row(3, 96, 22, line, "", K_TEAL, K_DIM, K_BG);
-    } else if (fx_held) {                         /* the held effects instead of the status */
-        uint32_t k, o = 0;
-        line[0] = 0;
-        for (k = 0; k < FX_N && o + 2u < sizeof line; k++)
-            if (fx_held >> k & 1u)
-                o += (uint32_t)snprintf(line + o, sizeof line - o, "%s%s", o ? " + " : "", FX_NAME[k]);
-        ui_row(3, 96, 22, line, "", K_CORAL, K_DIM, K_BG);
     } else {
         ui_row(3, 96, 22, line, "", lc, K_DIM, K_BG);
     }
@@ -530,7 +523,7 @@ static void ui_help(void)
     static const char *const L[9][2] = {
         {"KNOB 1..4", "continent .. station"}, {"SELECT", "next station"}, {"SEL", "browse the world"},
         {"PLAY", "play / stop"}, {"SAVE", "favorites"}, {"ARP", "synth on the keys"}, {"GLO", "WiFi, networks"},
-        {"MASTER", "volume"}, {"keys / FX", "hold for FX / tap tempo"}};
+        {"MASTER", "volume"}, {"keys / FX", "sample / tap tempo"}};
     int i;
     ui_title(0, "Controls", "");
     for (i = 0; i < 9; i++)

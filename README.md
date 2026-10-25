@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.16-alpha](docs/firmware/field-0.1.16-alpha.fwsc)**
+[Download 0.1.17-alpha](docs/firmware/field-0.1.17-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.16 update adds knob-selectable Lo-fi sampling: 2.728 seconds at 8 kHz, 5.456 seconds at 4 kHz or 10.912 seconds at 2 kHz, using the same memory. Saved clips retain their rate and overdubs stay aligned. Software checks pass; physical-device testing is still needed.
+The 0.1.17 update replaces the Delay/Reverb and held-key effects with one larger sampler: 2.728 seconds at 16 kHz, 5.456 seconds at 8 kHz, 10.912 seconds at 4 kHz, or 21.824 seconds at 2 kHz. It adds a continuous live-mix knob, louder sample/output gain with peak limiting, and persistent location caches to avoid full index scans on every boot. The LFO filter stays. Software checks pass; physical-device testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -26,23 +26,24 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | Control | Action |
 | --- | --- |
 | OCT− / OCT+ | Another recording from any page; ARP retains octave transposition and WiFi typing retains character layers |
-| REC | Save a favorite on the player / ENV; capture in ARP; remove in the favorites list |
+| REC | Save a favorite outside the sampler; capture in ARP / ENV; remove in the favorites list |
 | SEQ | Open favorites; press again to return |
-| SAVE | In ARP: save/replace one persistent clip. On the player: browse regions. On Delay/Reverb: toggle live FX send |
-| SELECT / SEL | Move / open in the browser; player shows credits; FX switches Delay / Reverb |
+| SAVE | In ARP: save/replace one persistent clip. On the player: browse regions. On GLO: refresh cached locations |
+| SELECT / SEL | Move / open in the browser; player shows credits; sampler cycles playback modes |
 | PLAY | Play / stop; start the highlighted region or favorite |
 | HOME | Up in the browser; worldwide random from the regional player |
 | GLO | WiFi setup (2.4 GHz) |
 | MASTER | Volume |
-| Keys | Play the captured sample on the player and in ARP; hold white keys for FX in ENV |
+| Keys | Play the captured sample on the player and in ARP; ENV opens the same sample editor |
 | ARP | Sample editor: REC capture, PLAY audition, SEL cycles one shot / loop hold / loop latch / slice; K1 start, K2 end, K3 pitch, K4 level |
-| PRESETS in ARP, outside Slice | Choose the next capture rate: 8 / 4 / 2 kHz, up to 2.7 / 5.5 / 10.9 seconds |
+| PRESETS in ARP, outside Slice | Choose the next capture rate: 16 / 8 / 4 / 2 kHz, up to 2.7 / 5.5 / 10.9 / 21.8 seconds |
 | PRESETS in ARP Slice | Select 4, 8, 16 or 27 equal slices of the trimmed clip; fewer slices are longer |
 | LFO | Open the filter page; press again or HOME to return to the player |
+| SELECT in ARP | Continuous live monitor mix, 0–100%; K4 independently sets sample level, 0–200% |
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
-| FX | Short tap sets tempo; hold 450 ms on HOME, the regional player or ARP to open Delay/Reverb |
-| PRESETS on either FX page | Set the shared BPM, 40–240; header displays it |
-| ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
+| FX | Tap tempo for the retained LFO filter |
+| PRESETS on LFO | Set BPM, 40–240; header displays it |
+| ENV | Shortcut to the same sampler editor; preserves the clip |
 | EDIT | Player: toggle Near. ARP: switch REPLACE / LAYER recording while stopped |
 
 In favorites, turn SELECT to move, then press SEL or PLAY to replay that exact recording.
@@ -50,7 +51,7 @@ Favorites survive power-off. Up to 16 fit in a separate 3,840-byte flash object;
 URLs and credits can fill it sooner. A full list asks you to remove an entry.
 These are online bookmarks: playback still requires WiFi and the recording to remain available.
 
-The sampler holds one **mono ADPCM clip** (one playback voice) in the same 12 KiB bank.
+The sampler holds one **mono ADPCM clip** (one playback voice) in a 24 KiB bank reclaimed from the removed effects.
 It survives returning to the main screen, changing recordings, and reopening ARP.
 REC again stops capture early; otherwise it stops at capacity. ARP's OCT buttons
 transpose; keys use C4 as the original pitch. In Loop hold, releasing the triggering key stops playback. Loop latch keeps
@@ -59,30 +60,29 @@ Slice divides the trimmed range into 4, 8, 16 or 27 equal sections at a common
 pitch. PRESETS selects the count while in Slice mode; higher keys repeat the
 sequence when fewer than 27 slices are selected. It starts at 27 on boot.
 Changing the count stops the current sample voice and retains the clip.
-SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving the sampler/FX workspace finishes capture without saving it.
+SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving the sampler finishes capture without saving it.
 The live recording stays audible in ARP by default. Turn ALGORITHM left to mute
-its monitor and right to restore it. This switch does not mute the sample or
-stop capture. A short fade avoids an abrupt gain change. Leaving ARP for Echo + Room retains this monitor setting; leaving that workspace restores
-the live recording; the editor remembers its switch until reboot.
+its monitor and right to restore it at the chosen SELECT mix. This switch does not mute the sample or
+stop capture. A short fade avoids an abrupt gain change. Leaving the editor restores full live playback; the editor remembers its mix and mute until reboot.
 
 Press **SAVE in ARP** to store one clip, including trim, pitch/octave, level,
 playback mode, slice count and recorded rate. SAVE during capture finishes it early and saves.
 The display confirms “Sample saved.” Another SAVE replaces this single slot.
 New captures and edits are temporary until saved. The saved clip restores at
-boot and when ARP is reopened with no clip after ENV reuses its RAM for FX.
-Sampler playback and Echo + Room now work together in separate memory. The ENV held-key mode still reuses the sample bank and clears its unsaved clip.
+boot and when the editor is reopened with no clip. Previous saved clips migrate when saved again; both sample banks commit only after payload verification. New expanded clips require 0.1.17 or later.
 Saving briefly interrupts audio while the flash is programmed. Failed writes
 retain the previous saved version. Normal FIELD updates preserve the slot;
 restoring other firmware or erasing user data can overwrite it.
 
 Turn **PRESETS in ARP outside Slice mode**, before recording in REPLACE,
-to select quality/time. Turn right for more Lo-fi; left returns to 8 kHz.
+to select quality/time. Turn right for more Lo-fi; left selects higher quality.
 
 | Recording rate | Capacity | Sound |
 | --- | --- | --- |
-| 8 kHz | 2.728 seconds | Original setting |
-| Lo-fi 4 kHz | 5.456 seconds | Less high-frequency detail |
-| Lo-fi 2 kHz | 10.912 seconds | Strong Lo-fi character |
+| 16 kHz | 2.728 seconds | Highest available bandwidth |
+| 8 kHz | 5.456 seconds | Default |
+| Lo-fi 4 kHz | 10.912 seconds | Less high-frequency detail |
+| Lo-fi 2 kHz | 21.824 seconds | Strong Lo-fi character |
 
 The right side of the status row shows the selected rate/capacity; Ready shows
 the current clip's actual length. Changing PRESETS does not stretch or retune
@@ -93,10 +93,9 @@ SEL to leave Slice before selecting recording quality.
 Overdubs use the existing clip's rate and duration. In LAYER with a clip,
 PRESETS reports “Layer uses clip rate”; use REPLACE to choose a new rate.
 SAVE stores the actual captured rate, and it restores on reboot at normal
-pitch. Existing 8 kHz saved clips remain compatible. Lo-fi clips need FIELD
-0.1.16 or later for rate-aware playback; older builds assume 8 kHz.
+pitch. Existing 8 kHz saved clips remain compatible. New clips need FIELD 0.1.17 or later. Existing clips retain their recorded rate and pitch.
 
-![FIELD Lo-fi sampling](docs/images/field-lofi.png)
+![FIELD expanded sampler](docs/images/field-expanded.png)
 
 Press **EDIT in ARP** to select **LAYER**, then **REC** to overdub the live
 recording onto the existing clip. It makes one pass over the full original
@@ -109,14 +108,11 @@ REC again stops early and leaves the remaining old audio intact. SAVE stops
 capture and stores the merged result in the existing single saved slot.
 **EDIT** switches back to **REPLACE** for a new recording; it defaults to Replace
 after reboot. If no clip exists, Layer makes a normal first capture. A layer
-is temporary until saved. FX remain available and are not baked into capture.
+is temporary until saved. The LFO filter remains available and is not baked into capture.
 
-![FIELD sample layering](docs/images/field-layer.png)
 
-The sampler uses a static landscape with four compact knob readouts and no
-keyboard activity display. Tap FX on any page to set tempo. ENV shows the BPM
-continuously; the player shows it briefly after tapping, and the FX LED pulses
-on the beat. A held stutter adopts a changed tempo immediately.
+
+The sampler uses a static landscape with compact knob readouts and no keyboard activity display. SELECT sets live mix; ALGORITHM mutes independently. Sample playback gain now reaches 200%, with a default of 173%. Overall output gains 1.5× before the master control, with stereo-linked peak limiting. Capture stays dry and unboosted for overdub headroom. This increases digital level, not the amplifier's physical maximum. Tap FX to set filter tempo; the player briefly displays BPM and the FX LED pulses on the beat.
 
 [USB live display](https://aveycole.github.io/FM1-Field/mirror/) mirrors the
 240×240 screen in desktop Chrome or Edge. Connect with FIELD running normally.
@@ -129,7 +125,7 @@ heartbeat releases it. The installer asks this site’s viewer to close its
 ports before taking USB ownership. Compressed audio and PCM buffers retain
 their previous sizes.
 
-![FIELD sampler](docs/images/field-sampler.png)
+
 
 LFO opens an independent stereo filter after the live/sample mix. The filter
 starts off at boot and activates on its first visit; it stays active when leaving
@@ -141,59 +137,24 @@ FX on this page enables sync and taps tempo; other FX taps update the shared
 tempo too. The header shows BPM. The static river scene and compact readouts
 match the sampler. Filter bypass and cutoff/resonance changes are smoothed.
 Samples remain playable on this page; OCT skips within the current region,
-REC saves favorites, ARP opens the sampler, ENV opens the separate live FX.
+REC saves favorites, ARP opens the sampler, ENV opens the same sampler editor.
 Capture remains before the filter, so the captured source stays dry. The filter
-needs a small amount of state and shares no sample/FX audio memory.
+needs a small amount of state and uses no sample audio history.
 
 ![FIELD river filter](docs/images/field-filter.png)
 
-Hold **FX** on HOME, the regional player or ARP for 450 ms to open the
-Delay/Reverb workspace. Short FX taps still set tempo. **SEL** switches between
-its two pages; both effects continue running. **ARP** returns to the sampler
-without clearing the clip or interrupting a latched loop. The keyboard works
-on both FX pages. HOME returns to the player; PRESETS adjusts BPM from 40–240.
-
-| Page | K1 | K2 | K3 | K4 / SELECT |
-| --- | --- | --- | --- | --- |
-| Delay | Division / free time | Feedback, 0–95% | Echo tone | Delay mix |
-| Reverb | Decay | High-frequency damping | Stereo width | Reverb mix |
-
-**EDIT** switches the delay between tempo sync and free time. Divisions are
-1/32, 1/16T, 1/16, 1/16D, 1/8T, 1/8, 1/8D, 1/4T, 1/4, 1/4D and 1/2.
-T means triplet; D means dotted. The actual time appears above the artwork.
-Free time spans roughly 20–720 ms; synced settings exceeding that capacity
-show **LIMIT** and the actual capped time. At 120 BPM a quarter note is 500 ms;
-a dotted quarter needs 750 ms and is limited to 720 ms.
-
-**SAVE** toggles the live recording's send to both effects. **LIVE DRY** keeps
-the live stream audible and dry while sample playback still enters Delay and
-Reverb. **LIVE FX** processes both. Existing tails decay naturally after the
-send is turned off. This controls Delay/Reverb; the separate LFO filter still
-processes the output. ARP's ALGORITHM live-monitor mute is retained while
-editing FX. On either FX page ALGORITHM bypasses/enables both effects. Set an
-effect's own mix to zero to hear only the other one.
-
-The effects retain a separate 12 KiB bank, allocated only when 24 KiB of heap
-will remain. “FX memory low” leaves the clip and current page intact. Stream
-and PCM buffers keep their sizes. The echo now runs at 5.5125 kHz to double its
-available duration; the room stays at 11.025 kHz and dry audio at 44.1 kHz.
-ENV frees this bank and opens the original exclusive held-key mode, which
-clears an unsaved sample. Save a clip before entering ENV.
-
-![FIELD Delay](docs/images/field-delay.png)
-![FIELD Reverb](docs/images/field-reverb.png)
+Delay/Reverb and the old held-key effects are removed in this sampler-focused build. Their memory now belongs to the longer clip. Pitch-independent time-stretch is not implemented; the pitch knob still changes playback speed and pitch together.
 
 Near is anchored when EDIT enables it and survives power-off. It does not drift
-with each skip. Its first selection scans the location index, potentially taking
-three minutes or longer; later skips use the nearby cache. EDIT disables it;
+with each skip. An uncached Near anchor scans the location index once, potentially taking three minutes or longer; later skips and reboots reuse its saved cache. EDIT disables it;
 choosing a region or worldwide random from SAVE also disables it. It never widens
 the radius silently if no locations match.
 
 ![FM1 FIELD startup](docs/images/field-startup.png)
 
-First startup downloads Aporee's location index and takes about three minutes,
-longer on a weak connection. Choosing a new region requires another index scan;
-subsequent skips use a 32-location cache. Worldwide mode has its own preserved cache.
+The first uncached location selection downloads Aporee's index and takes about three minutes, longer on a weak connection. FIELD saves a 32-location reservoir per cached world/region/Near context in eight rotating flash sectors. Later boots and exhausted batches reuse those locations and fetch only their playlists; recordings remain online. The worldwide cache is retained when other contexts rotate out. An uncached or evicted context requires another scan.
+
+Press **GLO → SAVE** to scan again and replace the current context's cached locations. This is a bounded location reservoir, not the full world index: without refresh, location diversity is limited to its saved batch. New recordings at those locations can still be selected. Writes occur only for a changed batch, with CRC validation and commit last; interrupted refreshes retain the previous saved copy.
 
 The catalogue contains **162 countries and 1,560 states/provinces** with recordings.
 It uses a snapshot of Aporee coordinates and generalized Natural Earth boundaries.
@@ -211,10 +172,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.16-alpha
+  python3 base/tools/build.py app --release 0.1.17-alpha
 ```
 
-This produces `app/build/field-0.1.16-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.17-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

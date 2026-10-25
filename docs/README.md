@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.16-alpha
+# FIELD — experimental 0.1.17-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -11,7 +11,7 @@ The original CREATURE firmware in the parent workspace is independent.
 - SEL: toggle location/coordinates and recording author/licence details.
 - SELECT / knob 4: another random recording. MASTER: volume.
 - Keys on the player and ARP play the same sample. ARP opens its editor; REC captures there.
-- ENV opens the original live effects on white keys, clearing the sample to reuse its memory.
+- ENV opens the same expanded sampler as ARP without clearing its clip.
 - EDIT toggles a fixed 50 km Near mode on the player; the header shows Near.
 - Hold HOME: controls. OCT− and OCT+ held together retain the platform's update entry.
 - SAVE: browse countries, then states/provinces. SELECT moves, SEL opens,
@@ -39,8 +39,7 @@ The display shows received KB. Keep it powered while it loads.
 A reservoir samples 32 locations uniformly from the complete index. Each skip
 uses a different location from that batch and fetches its `getPlaylist?locids[]=ID`
 response. A recording is randomly selected from that location's playable MP3s.
-After 32 selections the index is fetched again. The cache is in RAM and resets
-after a reboot. Selection is uniform by location, then by recording within it;
+After the batch is used, the saved locations are reused. Eight rotating flash sectors retain bounded location batches across reboot; GLO/SAVE refreshes the current batch with a new full scan. Selection is uniform by location, then by recording within it;
 it is not uniform over all recordings or over Earth's surface. Random coordinates
 without recordings are never invented.
 
@@ -56,9 +55,9 @@ New recordings remain available worldwide; their region assignments need a futur
 catalogue rebuild. Region names are transliterated for the device's ASCII font.
 
 The complete location-to-region lookup is compressed into the firmware; no
-geocoding service, proxy, or extra account is used. A new region requires a full
+geocoding service, proxy, or extra account is used. An uncached region requires a full
 live Aporee index scan (about three minutes) to filter and sample its locations.
-Later skips use that region's cache. The remaining worldwide cache is preserved
+Later skips and boots reuse that region's saved cache. The remaining worldwide cache is preserved
 when entering a region, so HOME can reuse it. Counts are snapshot location counts,
 not numbers of recordings. Very small regions may repeat a location.
 
@@ -125,7 +124,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.16-alpha
+  python3 base/tools/build.py app --release 0.1.17-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -685,3 +684,53 @@ lock, Slice's unchanged knob mapping and returning to the original setting.
 Existing sampler, layer, FX, filter and pixel-mirror tests pass; screens were
 visually checked. No sample/FX heap allocation or streaming-buffer change.
 Hardware checks: image 579504 B; RAM .data+.bss 130848 B of 131072; pool 308884 B of 311296. Physical-device testing is still needed.
+
+
+## Expanded sampler, live mix and persistent locations (0.1.17)
+
+This supersedes the previous FX and sampler-capacity descriptions. Delay/Reverb
+and ENV's held-key effects are removed. The single mono ADPCM bank is 24 KiB,
+43,648 frames: 16/8/4/2 kHz gives 2.728/5.456/10.912/21.824 seconds. Default is
+8 kHz. PRESETS selects the next replacement rate outside Slice; Layer retains
+the existing rate. Capture still averages the incoming dry source. Rate changes
+never stretch or retune an existing clip. Pitch-independent stretching is not
+implemented. The retained LFO filter requires no audio history; FX taps tempo,
+PRESETS on LFO sets BPM, and ENV opens the same sampler without clearing it.
+
+SELECT in the sampler controls live mix 0–100%, independently of ALGORITHM's
+mute switch. K4 controls sample level 0–200% (default 173%). Leaving restores
+unity live monitoring; editor mix/mute persist until reboot. Overall digital
+output gains 1.5x before MASTER. Stereo-linked peak limiters before the filter
+and after boost bound output; no capture amplification is baked into overdubs.
+No compressed stream or PCM buffer capacity is reduced.
+
+Expanded clips use SMP2, two 32 KiB banks at A0000..B0000. Old SMP1 banks at
+97000/9B000 remain readable; restore maps old rate indices to the new 16 kHz
+base. The first new SAVE commits in the new area, retaining the old save until
+verified. This layout holds one logical clip. Use 0.1.17 or later for new saves.
+
+The location reservoir is persisted independently at B0000..B8000: eight rotating
+4 KiB sectors, each storing up to 32 location IDs and coordinates plus context,
+sequence and CRC. Context distinguishes world, region and an exact Near anchor.
+The newest worldwide entry and the previous matching entry are retained during
+replacement; writes skip identical data and commit magic last. These sectors
+are inside the update loader's preserved data range and outside all sample,
+favorites/settings and update staging areas. Stock firmware may overwrite them.
+
+A successful uncached scan saves its reservoir before the first playlist request.
+Boot and exhausted batches reuse it instead of downloading getAllLocations.
+An uncached/evicted context still needs a first scan. GLO/SAVE explicitly fetches
+a fresh batch; failure or interrupted writes leave the previous saved copy.
+This caches location batches, not the complete world index or audio recordings.
+Location diversity stays bounded to the saved batch until refreshed; playlists
+are still requested online, so new recordings at cached locations can appear.
+
+Tests cover all four full capacities, playback pitch/duration and SNR, overdubs,
+live mix/mute/restore, output limiting, legacy save migration and interrupted
+sample saves. Cache tests use the actual network/parser and flash-cache code to
+verify boot, batch exhaustion, Near context switching, explicit refresh and
+busy refusal; flash tests cover erase/body/commit cuts, CRC fallback, world
+retention/eviction, redundant-write avoidance and isolation from sample banks.
+Simulator navigation, filter, display mirror and installer validation pass.
+Loader tests preserve saved clip and cache areas through update/reinstall.
+Hardware checks: image 575152 B; RAM .data+.bss 130720 B of 131072; pool 308772 B of 311296. Real-device testing remains necessary.

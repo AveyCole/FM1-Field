@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 /* Included after radio_net.c's HTTP transport. One TLS connection at a time.
- * A reservoir of 32 real locations is refreshed after it is used up. Shuffles
- * within the reservoir need only a small playlist request, not the world index. */
+ * Persist 32 real locations per cached context. Shuffles and restarts request
+ * only a playlist; GLO/SAVE explicitly refreshes the location reservoir. */
 #include "../aporee.h"
 #include "../aporee_json.h"
 #include "../regions.c"
@@ -10,11 +10,10 @@ volatile int ap_state;
 volatile uint32_t ap_bytes;
 char ap_why[32];
 ap_track_t ap_track __attribute__((section(".pool")));
-typedef struct { uint32_t id; int32_t lat, lon; } ap_loc_t;
 static ap_loc_t *ap_locs, *ap_world_locs; /* two 32-location caches, allocated together */
 static unsigned ap_world_n;
 static uint16_t ap_cache_region;
-static uint8_t ap_cache_near;
+static uint8_t ap_cache_near,ap_refresh;
 static int32_t ap_cache_lat,ap_cache_lon;
 static unsigned ap_n, ap_seen;
 static uint32_t ap_rng, ap_last;
@@ -118,10 +117,16 @@ static void ap_task(void *arg)
     (void)arg;
     if (!r) { why_to(ap_why, "no memory for Aporee"); ap_state = AP_ERROR; return; }
     memset(r, 0, sizeof *r);
+    if (!ap_n && !ap_refresh)
+        ap_n=ap_cache_load(ap_cache_region,ap_cache_near,ap_cache_lat,ap_cache_lon,ap_locs);
     if (!ap_n) {
         ap_seen = 0;
         strcpy(u, "https://aporee.org/api/maps/getAllLocations");
         if (ap_get(r, u, sizeof u)) { ap_n = 0; goto done; }
+        if(ap_n) {
+            ap_cache_save(ap_cache_region,ap_cache_near,ap_cache_lat,ap_cache_lon,ap_locs,ap_n);
+            ap_refresh=0;
+        }
     }
     if (!ap_n) { why_to(ap_why, ap_cache_near?"no locations within 50 km":"no locations in region"); goto done; }
     {
@@ -163,3 +168,9 @@ static int ap_begin(uint16_t region,int near,int32_t lat,int32_t lon)
 }
 int ap_start(uint16_t region) {return ap_begin(region,0,0,0);}
 int ap_start_near(int32_t lat,int32_t lon) {return ap_begin(0,1,lat,lon);}
+
+int ap_refresh_index(void)
+{
+    if(ap_state==AP_BUSY) return -1;
+    ap_n=ap_world_n=0;ap_refresh=1;return 0;
+}

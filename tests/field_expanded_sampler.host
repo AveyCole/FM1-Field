@@ -1,0 +1,69 @@
+wait 6000
+tap ENV
+expect page 6
+expect sam_quality 1
+tap REC
+wait 6000
+expect sam_state 2
+expect sam_len 43648
+expect sam_rate 8000
+turn SELECT -32
+expect sam_live_mix 63
+turn ALGO -1
+expect sam_muted 1
+turn ALGO 1
+expect sam_muted 0
+expect sam_live_mix 63
+shot field-expanded-8k.png
+tap EDIT
+tap REC
+wait 1000
+expect sam_dubbing 1
+tap SAVE
+expect sam_state 2
+expect sam_len 43648
+reboot
+wait 6000
+tap HOME
+tap ARP
+expect sam_len 43648
+expect sam_rate 8000
+expect sam_layer 0
+turn PRESET -1
+tap REC
+wait 3000
+expect sam_state 2
+expect sam_len 43648
+expect sam_rate 16000
+shot field-expanded-16k.png
+turn PRESET 2
+tap REC
+wait 12000
+expect sam_state 2
+expect sam_rate 4000
+expect sam_len 43648
+tap SAVE
+reboot
+wait 6000
+tap HOME
+tap ARP
+turn PRESET 1
+tap REC
+wait 23000
+expect sam_state 2
+expect sam_rate 2000
+expect sam_len 43648
+tap SAVE
+shot field-expanded-2k.png
+tap HOME
+press FX
+wait 600
+release FX
+expect page 0
+expect sam_state 2
+tap LFO
+expect page 10
+tap ENV
+expect page 6
+expect sam_state 2
+expect sam_len 43648

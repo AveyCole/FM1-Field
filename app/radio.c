@@ -90,9 +90,8 @@ static uint32_t radio_reconnects, radio_retry_at;  /* the stream dropped: when t
 static char radio_why[32];
 static int16_t *pcm_tmp;                          /* MINIMP3_MAX_SAMPLES_PER_FRAME, from the heap */
 
-#define FX_HIST 6144u                             /* the FX history, half-rate samples: ~279 ms */
-static int16_t *fx_hist;
-static volatile uint8_t fx_mode;
+#define SAMPLE_BYTES 24576u
+static int16_t *sample_bank;
 
 /* Aporee supplies MP3s. No AAC decoder or permanently reserved AAC arena. */
 static uint8_t dec_kind; /* 0 none, 1 MP3 */
@@ -127,10 +126,10 @@ static int radio_alloc(void)
         pcm_buf = 0;
         return -1;
     }
-    if (!fx_hist) {                               /* former FX buffer, now the sample bank */
-        fx_hist = malloc(FX_HIST * sizeof *fx_hist);
-        if (fx_hist)
-            memset(fx_hist, 0, FX_HIST * sizeof *fx_hist);
+    if (!sample_bank) {                               /* former FX buffer, now the sample bank */
+        sample_bank = malloc(SAMPLE_BYTES);
+        if (sample_bank)
+            memset(sample_bank, 0, SAMPLE_BYTES);
     }
     return 0;
 }
@@ -351,156 +350,8 @@ static void radio_poll(void)
 
 }
 
-/* ---- punch-in FX: held keys (fx_held, a bit per effect, the main loop's), applied in the audio interrupt.
- * Sources (one at a time, the lowest held): stutters, tape stop, reverse, half speed, played from a history
- * of the last ~280 ms (mono, 22 kHz, frozen while a source plays). Then the filters, the crushers, the ring
- * modulator, the chops and the mute. */
-enum { FX_LP, FX_HP, FX_PHONE, FX_CRUSH, FX_ST4, FX_ST8, FX_ST16, FX_ST32, FX_TAPE, FX_REV, FX_CHOP8, FX_CHOP16,
-       FX_RING, FX_HALF, FX_MUTE, FX_LOFI, FX_N };
-static const char *const FX_NAME[FX_N] = {"low-pass", "high-pass", "telephone", "crush", "stutter 1/8",
-    "stutter 1/16", "stutter 1/32", "stutter 1/64", "tape stop", "reverse", "chop 1/8", "chop 1/16", "ring mod",
-    "half speed", "mute", "lo-fi"};
-#define FX_SOURCES ((1u << FX_ST4) | (1u << FX_ST8) | (1u << FX_ST16) | (1u << FX_ST32) | (1u << FX_TAPE) | \
-                    (1u << FX_REV) | (1u << FX_HALF))
-static volatile uint32_t fx_held;
-static volatile uint32_t fx_beat = 22050u;        /* a beat in output samples (44.1 kHz): the tap tempo, 120 BPM */
-static struct {
-    uint32_t hw, half;                            /* history write index, the half-rate phase */
-    uint32_t src, start, beat;                    /* source, window start, last applied tap tempo */
-    float pos, speed;                             /* read position in the history (samples), its rate */
-    float lp[2][2], hp[2][2], bp[2][2];           /* the filters' states: [channel][low, band] */
-    float gate, ring_c, ring_s;                   /* the chop / mute gain; the ring oscillator */
-    uint32_t crush_n, chop_n, len, held_was;      /* len: the stutter's loop, history samples */
-    float crush_l, crush_r;
-} fx __attribute__((section(".pool")));                                     /* set up by fx_reset */
-
-static void fx_reset(void)
-{
-    memset(&fx, 0, sizeof fx);
-    fx.src = FX_N;
-    fx.gate = 1.0f;
-    fx.ring_c = 1.0f;
-}
-
-/* a Chamberlin state-variable filter: f = 2 sin(pi fc / fs), q = 1 / Q; returns low, band or high */
-static inline float fx_svf(float *st, float x, float f, float q, int out)
-{
-    float lo = st[0] + f * st[1], hi = x - lo - q * st[1], bd = f * hi + st[1];
-    st[0] = lo;
-    st[1] = bd;
-    return out == 0 ? lo : out == 1 ? bd : hi;
-}
-
-static float fx_hist_at(float p)                  /* the history at position p (samples, wrapping), linear */
-{
-    uint32_t i = (uint32_t)p;
-    float t = p - (float)i, a = fx_hist[i % FX_HIST], b = fx_hist[(i + 1u) % FX_HIST];
-    return (a + (b - a) * t) * (1.0f / 32768.0f);
-}
-
-/* one stereo sample through the held effects (x: -1..1) */
-static void fx_process(float *l, float *r)
-{
-    uint32_t held = fx_held, src = FX_N, k;
-    float m;
-    for (k = 0; fx_hist && k < FX_N; k++)                    /* the lowest held source */
-        if ((held >> k & 1u) && (FX_SOURCES >> k & 1u)) {
-            src = k;
-            break;
-        }
-    if (src != fx.src || (src>=FX_ST4 && src<=FX_ST32 && fx.beat!=fx_beat)) {
-        fx.src = src;
-        fx.beat = fx_beat;
-        if (src >= FX_ST4 && src <= FX_ST32) {    /* a 1/8 .. 1/64 note at the tempo, halved while too long */
-            uint32_t n = fx_beat >> (2u + (src - FX_ST4));   /* half a beat at 44.1 kHz = a beat >> 2 at 22.05 */
-            while (n > FX_HIST - 64u)
-                n >>= 1;
-            fx.len = n ? n : 1u;
-            fx.start = (fx.hw + FX_HIST - fx.len) % FX_HIST;
-            fx.pos = (float)fx.start;
-            fx.speed = 0.5f;
-        } else if (src == FX_TAPE || src == FX_HALF) {
-            fx.start = (fx.hw + 1u) % FX_HIST;    /* the oldest: plays the last ~280 ms */
-            fx.pos = (float)fx.start;
-            fx.speed = src == FX_TAPE ? 0.5f : 0.25f;
-        } else if (src == FX_REV) {
-            fx.pos = (float)((fx.hw + FX_HIST - 1u) % FX_HIST);
-            fx.speed = -0.5f;
-        }
-    }
-    if (src == FX_N) {                            /* the live sound into the history, at half rate */
-        if (fx_hist && ++fx.half & 1u)
-            fx_hist[fx.hw = (fx.hw + 1u) % FX_HIST] = (int16_t)((*l + *r) * 16383.0f);
-    } else {
-        float v = fx_hist_at(fx.pos);
-        *l = *r = v;
-        fx.pos += fx.speed;
-        if (src >= FX_ST4 && src <= FX_ST32) {
-            float end = (float)fx.start + (float)fx.len;
-            if (fx.pos >= end)
-                fx.pos -= (float)fx.len;
-        } else if (src == FX_TAPE) {
-            fx.speed *= 0.99996f;                 /* to a stop in about a second */
-        }
-        if (fx.pos >= (float)FX_HIST)
-            fx.pos -= (float)FX_HIST;
-        if (fx.pos < 0.0f)
-            fx.pos += (float)FX_HIST;
-    }
-    if (held >> FX_LP & 1u) {                     /* 500 Hz */
-        *l = fx_svf(fx.lp[0], *l, 0.0712f, 0.5f, 0);
-        *r = fx_svf(fx.lp[1], *r, 0.0712f, 0.5f, 0);
-    }
-    if (held >> FX_HP & 1u) {                     /* 1.5 kHz */
-        *l = fx_svf(fx.hp[0], *l, 0.2133f, 0.7f, 2);
-        *r = fx_svf(fx.hp[1], *r, 0.2133f, 0.7f, 2);
-    }
-    if (held >> FX_PHONE & 1u) {                  /* a band around 1 kHz, mono, driven */
-        m = fx_svf(fx.bp[0], (*l + *r) * 0.5f, 0.1424f, 0.6f, 1) * 2.5f;
-        m = m > 0.8f ? 0.8f : m < -0.8f ? -0.8f : m;
-        *l = *r = m;
-    }
-    if (held & (1u << FX_CRUSH | 1u << FX_LOFI)) {   /* sample-and-hold, then fewer levels */
-        uint32_t hold = held >> FX_CRUSH & 1u ? 6u : 2u;
-        float lv = held >> FX_CRUSH & 1u ? 12.0f : 48.0f;
-        if (++fx.crush_n >= hold) {
-            fx.crush_n = 0;
-            fx.crush_l = (float)(int32_t)(*l * lv) / lv;
-            fx.crush_r = (float)(int32_t)(*r * lv) / lv;
-        }
-        *l = fx.crush_l;
-        *r = fx.crush_r;
-    }
-    if (held >> FX_RING & 1u) {                   /* x a 330 Hz sine (a rotating phasor) */
-        float c = fx.ring_c, sn = fx.ring_s, e = 0.04700f;   /* 2 pi 330 / 44100 */
-        fx.ring_c = c - e * sn;
-        fx.ring_s = sn + e * fx.ring_c;
-        *l *= fx.ring_s;
-        *r *= fx.ring_s;
-    }
-    {   /* the chops (1/8 or 1/16 notes at the tempo, open for the first half, from the press) and the mute: a
-         * gain that moves in 2 ms, not a click */
-        float target = 1.0f;
-        uint32_t chops = held & (1u << FX_CHOP8 | 1u << FX_CHOP16);
-        if (chops & ~fx.held_was)
-            fx.chop_n = 0;                        /* a chop pressed: it starts open, on the press */
-        fx.held_was = held;
-        fx.chop_n++;
-        if (chops) {
-            uint32_t period = held >> FX_CHOP16 & 1u ? fx_beat >> 2 : fx_beat >> 1;
-            if (period < 64u)
-                period = 64u;
-            target = fx.chop_n % period < period / 2u ? 1.0f : 0.0f;
-        }
-        if (held >> FX_MUTE & 1u)
-            target = 0.0f;
-        fx.gate += (target - fx.gate) * 0.011f;
-        *l *= fx.gate;
-        *r *= fx.gate;
-    }
-}
-
-#include "field_space.c"
+static volatile uint32_t fx_beat=22050u; /* shared tap-tempo clock */
+#include "field_gain.c"
 #include "field_filter.c"
 /* the audio interrupt's: n frames into o (24-bit in 32, stereo) */
 static void radio_render(int32_t *o, uint32_t n)
@@ -529,11 +380,12 @@ static void radio_render(int32_t *o, uint32_t n)
             radio_underruns++;
         }
         sam_capture(l,rr,fresh);
-        if(playing && fx_mode) fx_process(&l,&rr);
         sam_monitor(&l,&rr);                     /* monitoring only: capture still receives the live source */
 
-        space_route(&l,&rr,sam_next());
+        {float sample=sam_next();l+=sample;rr+=sample;}
+        field_limit(&l,&rr,&field_mix_gain);
         fil_process(&l,&rr);
+        l*=1.5f;rr*=1.5f;field_limit(&l,&rr,&field_output_gain);
         o[2u * i] = (int32_t)(l * gain);
         o[2u * i + 1u] = (int32_t)(rr * gain);
     }

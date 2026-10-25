@@ -2,13 +2,13 @@ wait 6000
 expect fil_on 0
 tap ARP
 tap REC
-wait 3000
+wait 6000
 expect sam_state 2
 tap LFO
 expect page 10
 expect fil_on 1
 expect sam_state 2
-expect sam_len 21824
+expect sam_len 43648
 turn K1 -10
 turn K2 10
 turn K3 16
@@ -47,7 +47,7 @@ tap OCT+
 wait 400
 expect page 10
 expect ap_sound 2
-expect sam_len 21824
+expect sam_len 43648
 key 7 down
 wait 40
 expect sam_voice 1
@@ -82,8 +82,5 @@ tap HOME
 tap LFO
 expect fil_on 1
 tap ENV
-expect page 9
-expect sam_state 0
-key w4 down
-wait 100
-key w4 up
+expect page 6
+expect sam_state 2

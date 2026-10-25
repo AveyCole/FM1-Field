@@ -9,9 +9,9 @@ expect sam_state 1
 wait 1000
 expect sam_len >7500
 shot field-sampler-capturing.png
-wait 2000
+wait 5000
 expect sam_state 2
-expect sam_len 21824
+expect sam_len 43648
 turn K3 2
 expect sam_pitch 2
 tap SEL
@@ -69,7 +69,7 @@ tap ARP
 expect page 0
 expect sam_active 0
 expect sam_state 2
-expect sam_len 21824
+expect sam_len 43648
 key 7 down
 wait 100
 expect sam_voice 1
@@ -79,7 +79,7 @@ expect sam_voice 0
 tap REC
 expect ap_fav_status 1
 expect sam_state 2
-expect sam_len 21824
+expect sam_len 43648
 tap SEQ
 expect ap_favorites 1
 tap SEQ
@@ -98,21 +98,10 @@ wait 40
 expect sam_voice 0
 tap HOME
 tap ENV
-expect page 9
-expect fx_mode 1
-expect sam_state 0
-expect sam_len 0
-tap REC
-expect sam_state 0
-expect ap_fav_status 2
-key w0 down
-wait 100
-shot field-effects.png
-key w0 up
-tap ARP
 expect page 6
-expect fx_mode 0
-expect sam_state 0
+expect sam_state 2
+expect sam_len <5000
+
 tap HOME
 reboot
 expect sam_state 0

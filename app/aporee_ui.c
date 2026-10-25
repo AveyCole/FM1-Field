@@ -362,7 +362,7 @@ static void ui_help(void)
     ui_row(4,101,21,"SEL","credits / details",K_TEXT,K_DIM,K_BG);
     ui_row(5,122,21,"EDIT","Near / 50 km",K_TEXT,K_DIM,K_BG);
     ui_row(6,143,21,"REC / SEQ","save / favorites",K_TEXT,K_DIM,K_BG);
-    ui_row(7,164,21,"ARP / ENV","sampler / FX",K_TEXT,K_DIM,K_BG);
+    ui_row(7,164,21,"ARP / ENV","sample editor",K_TEXT,K_DIM,K_BG);
     ui_row(8,185,21,"SAVE","browse regions",K_TEXT,K_DIM,K_BG);
     ui_row(13,214,26,"Release HOME","",K_DIM,K_DIM,K_PANEL);
 }

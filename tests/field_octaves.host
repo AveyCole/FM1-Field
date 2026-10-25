@@ -44,6 +44,6 @@ tap HOME
 tap ENV
 tap OCT+
 wait 400
-expect page 9
-expect fx_mode 1
-expect ap_sound 6
+expect page 6
+expect sam_oct 2
+expect ap_sound 5

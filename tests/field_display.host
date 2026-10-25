@@ -13,11 +13,6 @@ screen on player.syx
 wait 3000
 fbdump player.rgb
 screen off
-tap ENV
-screen on effects.syx
-wait 3000
-fbdump effects.rgb
-screen off
 tap LFO
 screen on filter.syx
 wait 3000

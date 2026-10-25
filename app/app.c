@@ -58,6 +58,7 @@ static const char *wifi_status_str(void)
 #include "synth.c"
 #include "sampler.c"
 #include "sample_store.c"
+#include "field_index_cache.c"
 
 /* ---- the station of the last session (OBJ_RADIO), and the synth's settings (saved before them: older saves
  * end at st_title, and load with the synth at its defaults) */
@@ -152,8 +153,7 @@ static void wire_line(const char *s) { wire_send(0x10, s); }
 static void wire_end(void) { wire_send(0x11, 0); }
 static volatile uint8_t wire_cmd, wire_arg, wire_arg2;
 
-static const uint8_t WHITE_KEY[16] = PLAT_WHITE_KEYS;   /* F3 .. G5 */
-static uint32_t fx_wire;
+
 static volatile uint8_t url_restart;
 static uint32_t main_loops;
 
@@ -199,7 +199,7 @@ static void tempo_tap(uint32_t now)
 #define K_TEAL RGB(160, 187, 125)
 #include "field_splash.c"
 
-enum { PG_HOME, PG_BROWSE, PG_WIFI, PG_NETS, PG_PASS, PG_HELP, PG_SYNTH, PG_FAV, PG_REGION, PG_EFFECTS, PG_FILTER, PG_SPACE };
+enum { PG_HOME, PG_BROWSE, PG_WIFI, PG_NETS, PG_PASS, PG_HELP, PG_SYNTH, PG_FAV, PG_REGION, PG_FILTER=10 };
 static uint8_t ui_page, ui_dirty = 1;
 static int ui_sel, ui_top;
 static uint32_t ui_scan_t;                        /* the scan asked for (ms), 0 = none waiting */
@@ -291,6 +291,7 @@ static void ui_status(void)
             w_cpy(nm, radio_status_str(), sizeof nm);
         ui_row(5, 152, 26, "Stream", nm, K_DIM, rc, K_BG);
     }
+    ui_row(12,184,24,ap_state==AP_BUSY?"Loading locations...":"SAVE refresh locations","",K_DIM,K_TEXT,K_BG);
     ui_row(13, 214, 26, wifi_st == WS_OFF ? "PLAY wifi on  SEL networks" : "PLAY wifi off  SEL networks",
            "HOME", K_DIM, K_DIM, K_PANEL);
 }
@@ -449,33 +450,8 @@ static uint32_t sam_keys;
 static int8_t sam_key=-1;
 static void sampler_open(void)
 {
-    if(sam_state==SAM_EMPTY) {fx_mode=0;fx_held=fx_wire=0;(void)sam_restore();}
+    if(sam_state==SAM_EMPTY) (void)sam_restore();
     sam_enter();
-}
-static void effects_open(void)
-{
-    int had_sample=sam_state!=SAM_EMPTY;
-    space_active=0;
-    free(space_data);space_data=0;
-    sam_voice=sam_gate=0;sam_state=SAM_EMPTY;sam_len=0;
-    sam_active=0;sam_keys=0;
-    if(fx_hist) memset(fx_hist,0,FX_HIST*sizeof *fx_hist);
-    fx_reset();fx_mode=1;ui_page_set(PG_EFFECTS);
-    if(had_sample) w_cpy(ui_msg,"Sample cleared for FX",sizeof ui_msg);
-}
-static void ui_effects(void)
-{
-    char bpm[16];unsigned k;const char *name=ui_msg[0]?ui_msg:"White keys / hold for FX";
-    for(k=0;k<FX_N;k++) if(fx_held>>k&1u) {name=FX_NAME[k];break;}
-    snprintf(bpm,sizeof bpm,"%u BPM",(unsigned)tempo_bpm);
-    ui_title(0,"Effects",bpm);
-    ui_row(1,42,24,name,"",K_CORAL,K_DIM,K_BG);
-    ui_row(2,70,24,"Keys 1-4","filter / crush",K_TEXT,K_DIM,K_BG);
-    ui_row(3,94,24,"Keys 5-8","tempo stutters",K_TEXT,K_DIM,K_BG);
-    ui_row(4,118,24,"Keys 9-12","tape / reverse / chop",K_TEXT,K_DIM,K_BG);
-    ui_row(5,142,24,"Keys 13-16","ring / half / mute / lo-fi",K_TEXT,K_DIM,K_BG);
-    ui_piano(6,174,-1,plat_keys());
-    ui_row(13,214,26,"FX tap  PRESETS BPM","ENV back",K_DIM,K_DIM,K_PANEL);
 }
 static int sam_knob(volatile uint8_t *v,int32_t d)
 {
@@ -487,7 +463,7 @@ static int sam_knob(volatile uint8_t *v,int32_t d)
 static void ui_sampler(void)
 {
     static const char *const labels[4]={"K1 START","K2 END","K3 PITCH","K4 LEVEL"};
-    static const char *const quality[]={"8k / 2.7s","LO 4k / 5.5s","LO 2k / 10.9s"};
+    static const char *const quality[]={"16k / 2.7s","8k / 5.5s","LO 4k / 10.9s","LO 2k / 21.8s"};
     char a[20],b[20],c[20],d[20],status[40],mode[16];
     snprintf(mode,sizeof mode,"Slice / %u",(unsigned)sam_slices);
     ui_title(0,sam_layer?"Sampler / Layer":"Sampler",sam_loop==3?mode:sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
@@ -496,11 +472,12 @@ static void ui_sampler(void)
     else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/sam_rate()));
     else w_cpy(status,"REC captures",sizeof status);
     ui_row(1,40,28,status,quality[sam_state==SAM_CAPTURE || (sam_layer && sam_len>=64)?sam_rate_shift:sam_quality],sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
-    ui_row(4,68,20,sam_layer?"EDIT / LAYER":"EDIT / REPLACE",sam_muted?"LIVE MUTED":"LIVE ON",K_DIM,sam_muted?K_CORAL:K_TEAL,K_BG);
+    snprintf(d,sizeof d,"LIVE %u%%",(unsigned)sam_live_mix*100u/127u);
+    ui_row(4,68,20,sam_layer?"EDIT / LAYER":"EDIT / REPLACE",sam_muted?"LIVE MUTED":d,K_DIM,sam_muted?K_CORAL:K_TEAL,K_BG);
     snprintf(a,sizeof a,"%u%%",(unsigned)(sam_start*100u/127u));
     snprintf(b,sizeof b,"%u%%",(unsigned)(sam_end*100u/127u));
     snprintf(c,sizeof c,"%+d st",sam_pitch+12*sam_oct);
-    snprintf(d,sizeof d,"%u%%",(unsigned)(sam_level*100u/127u));
+    snprintf(d,sizeof d,"%u%%",(unsigned)(sam_level*200u/127u));
     ui_landscape(0);
     ui_knobs(labels,a,b,c,d);
     ui_row(13,214,26,sam_loop==3?"PRESETS slices":"PRESETS Lo-fi","SAVE clip",K_DIM,K_DIM,K_PANEL);
@@ -523,40 +500,6 @@ static void ui_filter(void)
     ui_row(13,214,26,"SEL type  EDIT sync","LFO back",K_DIM,K_DIM,K_PANEL);
 }
 
-static void space_open(void)
-{
-    if(!space_data) {
-        if(plat_screen_memory()<FX_HIST*2u+24576u || !(space_data=malloc(FX_HIST*2u))) {
-            w_cpy(ui_msg,"FX memory low",sizeof ui_msg);ui_dirty=1;return;
-        }
-        memset(space_data,0,FX_HIST*2u);
-    }
-    if(!space_active) {
-        fx_mode=0;fx_held=fx_wire=0;
-        space_reset();space_on=space_active=1;
-    }
-    ui_page_set(PG_SPACE);
-}
-static void ui_space(void)
-{
-    static const char *const delay[]={"K1 TIME","K2 FEED","K3 TONE","K4 MIX"};
-    static const char *const room[]={"K1 DECAY","K2 DAMP","K3 WIDTH","K4 MIX"};
-    char a[16],b[16],c[16],d[16],bpm[16],status[28];
-    unsigned ms=(space_frames()*400u+1102u)/2205u;
-    snprintf(bpm,sizeof bpm,"%u BPM",(unsigned)tempo_bpm);ui_title(0,space_page?"FX / Reverb":"FX / Delay",bpm);
-    ui_row(1,42,24,space_on?"ALGO / ON":"ALGO / BYPASS",space_live?"LIVE FX":"LIVE DRY",K_DIM,K_CORAL,K_BG);
-    snprintf(status,sizeof status,"%ums / %s",ms,space_sync?space_wanted()>3969?"LIMIT":"SYNC":"FREE");
-    ui_row(4,68,20,"PRESETS BPM",status,K_DIM,K_TEAL,K_BG);
-    if(space_page) snprintf(a,sizeof a,"%u%%",(unsigned)space_room*100u/127u);
-    else if(space_sync) w_cpy(a,SPACE_NOTE[space_division()],sizeof a);
-    else snprintf(a,sizeof a,"%ums",ms);
-    snprintf(b,sizeof b,"%u%%",space_page?(unsigned)space_damping*100u/127u:(unsigned)space_feedback*95u/127u);
-    snprintf(c,sizeof c,"%u%%",(unsigned)(space_page?space_width:space_tone)*100u/127u);
-    snprintf(d,sizeof d,"%u%%",(unsigned)(space_page?space_room_mix:space_mix)*100u/127u);
-    ui_landscape(1);ui_knobs(space_page?room:delay,a,b,c,d);
-    ui_row(13,214,26,space_page?"SAVE live FX":"EDIT sync  SAVE live",space_page?"SEL delay":"SEL reverb",K_DIM,K_DIM,K_PANEL);
-}
-
 static void ui_draw(void)
 {
     if (ui_dirty) {
@@ -576,17 +519,14 @@ static void ui_draw(void)
     case PG_NETS: ui_nets(); break;
     case PG_PASS: ui_pass(); break;
     case PG_SYNTH: ui_sampler(); break;
-    case PG_EFFECTS: ui_effects(); break;
     case PG_FILTER: ui_filter(); break;
-    case PG_SPACE: ui_space(); break;
     default: ui_help(); break;
     }
 }
 
 static void ui_page_set(int pg)
 {
-    if(ui_page==PG_EFFECTS && pg!=PG_EFFECTS) {fx_mode=0;fx_held=0;fx_wire=0;}
-    if(sam_active && pg!=PG_SYNTH && pg!=PG_SPACE) {
+    if(sam_active && pg!=PG_SYNTH) {
         sam_exit();
 
     }
@@ -701,7 +641,7 @@ static void wire_actions(void)
     case 0x46:                                    /* as a knob: level 0..3 (K1..K4), a signed step */
         sel_turn(wire_arg & 3u, (int8_t)(wire_arg2 & 0x40u ? wire_arg2 | 0x80u : wire_arg2));
         break;
-    case 0x47: fx_wire = wire_arg && wire_arg <= FX_N ? 1u << (wire_arg - 1u) : 0u; break;
+    case 0x47: break; /* retired held-key FX command */
     case 0x48: tempo_set(60000u / (wire_arg ? wire_arg + 40u : 120u), plat_ms()); break;
     case 0x54: ap_shuffle(); break;
     default: break;
@@ -714,11 +654,10 @@ void app_init(void)
     /* Reserve the large stream buffers before WiFi's task allocations fragment the heap. */
     (void)radio_alloc();
     screen_stop();
-    sam_init(fx_hist);
+    sam_init(sample_bank);
     (void)sam_restore();
     fil_init();
-    space_active=0;free(space_data);space_data=0;space_reset();
-    fx_mode=0;fx_held=0;
+    field_mix_gain=field_output_gain=1;
     rset_load();
 }
 
@@ -750,25 +689,16 @@ void app_ui_init(void)
 }
 
 static uint32_t btn_prev;
-static uint32_t fx_press_ms;
-static uint8_t fx_pending;
+
 static void input(void)
 {
-    uint32_t now = plat_buttons(), down = now & ~btn_prev, up=btn_prev&~now;
+    uint32_t now = plat_buttons(), down = now & ~btn_prev;
     int32_t turn = plat_enc(EN_SELECT);
     int32_t algo = plat_enc(EN_ALGO);
     int32_t presets = plat_enc(EN_PRESET);
     btn_prev = now;
-    if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH) fx_pending=0;
-    if(down&(1u<<B_FX)) {
-        if(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH) {fx_pending=1;fx_press_ms=plat_ms();}
-        else {tempo_tap(plat_ms());fil_restart=1;if(ui_page==PG_FILTER) fil_sync=1;}
-    }
-    if(fx_pending) {
-        if((now&(1u<<B_FX)) && plat_ms()-fx_press_ms>=450u) {fx_pending=0;space_open();return;}
-        if(up&(1u<<B_FX)) {fx_pending=0;tempo_tap(fx_press_ms);fil_restart=1;}
-    }
-    if(presets && (ui_page==PG_EFFECTS || ui_page==PG_SPACE)) {
+    if(down&(1u<<B_FX)) {tempo_tap(plat_ms());fil_restart=1;if(ui_page==PG_FILTER) fil_sync=1;}
+    if(presets && ui_page==PG_FILTER) {
         int bpm=(int)tempo_bpm+presets;bpm=bpm<40?40:bpm>240?240:bpm;
         tempo_set((60000u+(unsigned)bpm/2u)/(unsigned)bpm,plat_ms());tap_n=0;fil_restart=1;
     }
@@ -792,27 +722,22 @@ static void input(void)
         }
     }
     {   /* One shared keyboard on the player and sample editor. */
-        uint32_t keys=(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH || ui_page==PG_FILTER || ui_page==PG_SPACE)?plat_keys():0u;
+        uint32_t keys=(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH || ui_page==PG_FILTER)?plat_keys():0u;
         uint32_t on=keys&~sam_keys,off=sam_keys&~keys;int k;
         if(sam_key>=0 && (off>>(unsigned)sam_key&1u) && sam_loop==1) sam_gate=0;
-        if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH && ui_page!=PG_FILTER && ui_page!=PG_SPACE && sam_loop!=2) sam_gate=0;
+        if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH && ui_page!=PG_FILTER && sam_loop!=2) sam_gate=0;
         sam_keys=keys;
         for(k=0;k<NKEYS;k++) if(on>>k&1u) {
             if(sam_loop==2 && sam_voice && sam_key==k) sam_gate=0;
             else {sam_note(53+k);sam_key=(int8_t)k;}
         }
     }
-    {
-        uint32_t keys=ui_page==PG_EFFECTS?plat_keys():0u,h=0;int w;
-        for(w=0;w<16;w++) if(keys>>WHITE_KEY[w]&1u) h|=1u<<w;
-        fx_held=ui_page==PG_EFFECTS?h|fx_wire:0u;
-    }
     if (ui_page == PG_HOME || ui_page == PG_REGION) {
-        if(down&(1u<<B_ENV)) {effects_open();return;}
+        if(down&(1u<<B_ENV)) {sampler_open();ui_page_set(PG_SYNTH);return;}
         if (down & (1u << B_PLAY))
             radio_toggle();
         if (down & (1u << B_ARP)) {
-            if(!fx_hist) {ap_fav_notice(7);return;}
+            if(!sample_bank) {ap_fav_notice(7);return;}
             sampler_open();sam_keys=0;sam_key=-1;
             ui_page_set(PG_SYNTH);
             return;
@@ -833,6 +758,9 @@ static void input(void)
     } else if (ui_page == PG_FAV) {
         ap_fav_input(down,turn);
     } else if (ui_page == PG_WIFI) {
+        if(down&(1u<<B_SAVE)) {
+            if(!ap_refresh_index()) ap_shuffle();
+        }
         if (down & (1u << B_PLAY))
             wifi_power(wifi_st == WS_OFF);
         if (down & (1u << B_SEL)) {
@@ -895,7 +823,7 @@ static void input(void)
         if((down&(1u<<B_EDIT)) && sam_state!=SAM_CAPTURE) sam_layer=!sam_layer;
         if(presets && sam_loop!=3 && sam_state!=SAM_CAPTURE) {
             if(sam_layer && sam_len>=64) w_cpy(ui_msg,"Layer uses clip rate",sizeof ui_msg);
-            else {x=(int)sam_quality+presets;sam_quality=(uint8_t)(x<0?0:x>2?2:x);ui_msg[0]=0;}
+            else {x=(int)sam_quality+presets;sam_quality=(uint8_t)(x<0?0:x>3?3:x);ui_msg[0]=0;}
         }
         if(presets && sam_loop==3) {
             static const uint8_t counts[]={4,8,16,27};int i=0;
@@ -903,13 +831,13 @@ static void input(void)
             i+=presets;i=i<0?0:i>3?3:i;sam_slices=counts[i];sam_slice%=sam_slices;sam_voice=sam_gate=0;
         }
         if(algo) sam_muted=algo<0;
-        if(down&(1u<<B_ENV)) {effects_open();return;}
+        if(down&(1u<<B_ENV)) {sampler_open();ui_page_set(PG_SYNTH);return;}
         sam_knob(&sam_start,plat_enc(EN_K1));
         if(sam_start>125) sam_start=125;
         sam_knob(&sam_end,plat_enc(EN_K2));
         if(sam_end<=sam_start) sam_end=sam_start+1u;
         x=sam_pitch+plat_enc(EN_K3);sam_pitch=(int8_t)(x < -24?-24:x>24?24:x);
-        sam_knob(&sam_level,plat_enc(EN_K4)+turn);
+        sam_knob(&sam_level,plat_enc(EN_K4));sam_knob(&sam_live_mix,turn);
         if((down&(1u<<B_OCTDN)) && sam_oct>-2) sam_oct--;
         if((down&(1u<<B_OCTUP)) && sam_oct<2) sam_oct++;
         if(down&(1u<<B_SEL)) {
@@ -940,26 +868,7 @@ static void input(void)
         if(down&(1u<<B_REC)) ap_fav_save();
         if((down&(1u<<B_SEQ)) && ap_fav_open()) ui_page_set(PG_FAV);
         if(down&(1u<<B_ARP)) {sampler_open();ui_page_set(PG_SYNTH);}
-        if(down&(1u<<B_ENV)) effects_open();
-    } else if(ui_page==PG_SPACE) {
-        if(algo) space_on=algo>0;
-        sam_knob(space_page?&space_room:&space_time,plat_enc(EN_K1));sam_knob(space_page?&space_damping:&space_feedback,plat_enc(EN_K2));
-        sam_knob(space_page?&space_width:&space_tone,plat_enc(EN_K3));sam_knob(space_page?&space_room_mix:&space_mix,plat_enc(EN_K4)+turn);
-        if(down&(1u<<B_EDIT)) space_sync=!space_sync;
-        if(down&(1u<<B_SEL)) {space_page=!space_page;ui_dirty=1;}
-        if(down&(1u<<B_SAVE)) space_live=!space_live;
-        if(down&(1u<<B_PLAY)) radio_toggle();
-        if(down&(1u<<B_REC)) ap_fav_save();
-        if((down&(1u<<B_SEQ)) && ap_fav_open()) ui_page_set(PG_FAV);
-        if(down&(1u<<B_HOME)) ui_page_set(ap_player_page());
-        if(down&(1u<<B_ENV)) effects_open();
-        if(down&(1u<<B_ARP)) {sampler_open();ui_page_set(PG_SYNTH);}
-    } else if(ui_page==PG_EFFECTS) {
-        if(down&(1u<<B_REC)) ap_fav_save();
-        if((down&(1u<<B_SEQ)) && ap_fav_open()) {ui_page_set(PG_FAV);return;}
-        if(down&(1u<<B_PLAY)) radio_toggle();
-        if(down&((1u<<B_ENV)|(1u<<B_HOME))) ui_page_set(ap_player_page());
-        if(down&(1u<<B_ARP)) {sampler_open();ui_page_set(PG_SYNTH);}
+        if(down&(1u<<B_ENV)) {sampler_open();ui_page_set(PG_SYNTH);}
     }
 }
 void app_input_only(void) { input(); }
@@ -983,7 +892,6 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
 {
     int i, n = 0;
     if (!strcmp(what,"tempo_bpm")) *got=(int)tempo_bpm;
-    else if (!strcmp(what,"fx_len")) *got=(int)fx.len;
     else if (!strcmp(what,"screen_on")) *got=screen!=0;
     else if (!strcmp(what,"sam_muted")) *got=sam_muted;
     else if (!strcmp(what,"sam_layer")) *got=sam_layer;
@@ -991,24 +899,13 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"sam_dub_pos")) *got=(int)sam_dub_pos;
     else if (!strcmp(what,"sam_quality")) *got=sam_quality;
     else if (!strcmp(what,"sam_rate")) *got=(int)sam_rate();
+    else if (!strcmp(what,"sam_live_mix")) *got=sam_live_mix;
     else if (!strcmp(what,"sam_slices")) *got=sam_slices;
     else if (!strcmp(what,"fil_on")) *got=fil_seen && fil_on;
     else if (!strcmp(what,"fil_type")) *got=fil_type;
     else if (!strcmp(what,"fil_depth")) *got=fil_depth;
     else if (!strcmp(what,"fil_rate")) *got=fil_rate;
     else if (!strcmp(what,"fil_sync")) *got=fil_sync;
-    else if (!strcmp(what,"space_active")) *got=space_active;
-    else if (!strcmp(what,"space_on")) *got=space_on;
-    else if (!strcmp(what,"space_sync")) *got=space_sync;
-    else if (!strcmp(what,"space_mix")) *got=space_mix;
-    else if (!strcmp(what,"space_page")) *got=space_page;
-    else if (!strcmp(what,"space_live")) *got=space_live;
-    else if (!strcmp(what,"space_div")) *got=(int)space_division();
-    else if (!strcmp(what,"space_feedback")) *got=space_feedback;
-    else if (!strcmp(what,"space_room_mix")) *got=space_room_mix;
-    else if (!strcmp(what,"space_tone")) *got=space_tone;
-    else if (!strcmp(what,"space_damping")) *got=space_damping;
-    else if (!strcmp(what,"space_width")) *got=space_width;
     else if (!strcmp(what,"screen_bytes")) *got=sizeof(field_screen_t);
     else if (!strcmp(what,"screen_drops")) *got=screen?(int)screen->drops:0;
     else if (!strcmp(what, "page"))
@@ -1057,7 +954,6 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"sam_pitch")) *got=sam_pitch;
     else if (!strcmp(what,"sam_oct")) *got=sam_oct;
     else if (!strcmp(what,"sam_slice")) *got=sam_slice;
-    else if (!strcmp(what,"fx_mode")) *got=fx_mode;
     else if (!strcmp(what, "syn_wave"))
         *got = syn.wave;
     else if (!strcmp(what, "syn_cutoff"))
@@ -1095,7 +991,7 @@ static void lights(void)
         lb = 1u << B_HOME | 1u << B_SEQ | 1u << B_GLO;
         if(ap_favs && ap_favs->count) lb |= 1u << B_SEL | 1u << B_PLAY | 1u << B_REC;
     } else if (ui_page == PG_WIFI) {
-        lb = 1u << B_PLAY | 1u << B_SEL | 1u << B_HOME | 1u << B_GLO;
+        lb = 1u << B_PLAY | 1u << B_SEL | 1u << B_HOME | 1u << B_GLO | 1u << B_SAVE;
     } else if (ui_page == PG_NETS) {
         lb = 1u << B_SEL | 1u << B_HOME | 1u << B_PLAY | 1u << B_SAVE;
     } else if (ui_page == PG_PASS) {
@@ -1107,11 +1003,7 @@ static void lights(void)
         lb|=1u<<B_ENV|1u<<B_SAVE;
         lk = ((1u << NKEYS) - 1u) & ~sam_keys;    /* the keys lit, the held ones off */
     }
-    if(ui_page==PG_EFFECTS) {
-        lb=1u<<B_ENV|1u<<B_HOME|1u<<B_ARP|1u<<B_PLAY|1u<<B_FX|1u<<B_GLO|1u<<B_REC|1u<<B_SEQ;
-        lk=((1u<<NKEYS)-1u)&~plat_keys();
-    }
-    if(ui_page==PG_FILTER || ui_page==PG_SPACE) {
+    if(ui_page==PG_FILTER) {
         lb=1u<<B_HOME|1u<<B_SEL|1u<<B_EDIT|1u<<B_PLAY|1u<<B_REC|1u<<B_SEQ|1u<<B_ARP|1u<<B_ENV;
         if(sam_state==SAM_READY) lk=((1u<<NKEYS)-1u)&~sam_keys;
     }
@@ -1238,6 +1130,7 @@ int ap_start(uint16_t region) {
     }
     return 0;
 }
+int ap_refresh_index(void) {return ap_state==AP_BUSY?-1:0;}
 int ap_start_near(int32_t lat,int32_t lon)
 {
     int rc=ap_start(0);

@@ -59,7 +59,7 @@
 <body>
 <main>
   <button type="button" class="lang" id="lang" lang="ja">日本語</button>
-  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Longer Lo-fi samples · 0.1.16-alpha</strong><br>0.1.16 adds longer Lo-fi sampling. In ARP, outside Slice mode, turn PRESETS: 8 kHz gives 2.7 seconds, Lo-fi 4 kHz gives 5.5 seconds, and Lo-fi 2 kHz gives 10.9 seconds. The choice applies to the next new capture; lower rates trade high-frequency detail for time. Existing clips keep their pitch, SAVE stores their rate, and overdubs use the existing clip’s rate. In Slice mode PRESETS still selects slice count. Software audio, timing, save and screen checks pass; device testing is still needed. Leave FIELD running normally and press Install. Back up your projects first.</p>
+  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Expanded sampler + saved locations · 0.1.17-alpha</strong><br>0.1.17 focuses on one bigger sampler: 16 kHz / 2.7 seconds, 8 kHz / 5.5 seconds, Lo-fi 4 kHz / 10.9 seconds, or Lo-fi 2 kHz / 21.8 seconds. PRESETS chooses quality before a replacement capture; Slice mode still uses it for slice count. SELECT controls live mix, ALGORITHM mutes it, and K4 sets sample level up to 200%. Overall output is louder with peak limiting. Delay/Reverb and held-key effects are removed to reclaim memory; the LFO filter stays. Location batches now survive reboot, with GLO → SAVE for a fresh scan. Existing clips migrate safely. Software checks pass; physical-device testing is still needed. Leave FIELD running normally and press Install. Back up your projects first.</p>
   <p data-t="intro">Connect the FM-1 by USB, then press Install. It works in Chrome or Edge; the browser asks once to allow MIDI: allow it.</p>
   <p data-t="warn">Do not unplug the USB cable while writing.</p>
   <p class="small" data-t="direct"></p>
@@ -114,6 +114,6 @@
     Fonts: Barlow Semi Condensed (SIL OFL 1.1). M-VAVE and FM-1 are trademarks of their respective owners.<br>
     <span data-t="license"></span> <a href="https://github.com/AveyCole/FM1-Field" target="_blank" rel="noopener">FIELD source on GitHub<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
 </footer>
-<script type="module" src="../flasher.js?v=0.1.16-lofi-1"></script>
+<script type="module" src="../flasher.js?v=0.1.17-expanded-cache-1"></script>
 </body>
 </html>

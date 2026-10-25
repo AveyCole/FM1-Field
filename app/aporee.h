@@ -12,3 +12,7 @@ extern volatile uint32_t ap_bytes;
 extern char ap_why[32];
 int ap_start(uint16_t region);
 int ap_start_near(int32_t lat,int32_t lon);
+typedef struct {uint32_t id;int32_t lat,lon;} ap_loc_t;
+unsigned ap_cache_load(uint16_t region,int near,int32_t lat,int32_t lon,ap_loc_t *locs);
+void ap_cache_save(uint16_t region,int near,int32_t lat,int32_t lon,const ap_loc_t *locs,unsigned n);
+int ap_refresh_index(void);
