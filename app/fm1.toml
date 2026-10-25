@@ -9,6 +9,7 @@ usb_audio_out = false
 words = "words.tsv"
 # MP3 only: reclaimed the AAC arena for streaming reserve.
 o2 = []
+font_pad = 1                   # same visible glyphs; omit a transparent border to save flash
 vendored = ["third_party/"]           # BearSSL and minimp3: the register check skips them (x86 / POWER8 code off)
 device_include = ["third_party/compat"]   # minimp3's <string.h> / <stdlib.h>: the toolchain has no C library headers
 # the stream and Radio Garden (net/radio_net.c), with BearSSL for https, built as the SDK builds code that talks lwIP

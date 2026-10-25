@@ -366,7 +366,7 @@ static volatile uint32_t fx_held;
 static volatile uint32_t fx_beat = 22050u;        /* a beat in output samples (44.1 kHz): the tap tempo, 120 BPM */
 static struct {
     uint32_t hw, half;                            /* history write index, the half-rate phase */
-    uint32_t src, start;                          /* the source playing (FX_N: none), where its window starts */
+    uint32_t src, start, beat;                    /* source, window start, last applied tap tempo */
     float pos, speed;                             /* read position in the history (samples), its rate */
     float lp[2][2], hp[2][2], bp[2][2];           /* the filters' states: [channel][low, band] */
     float gate, ring_c, ring_s;                   /* the chop / mute gain; the ring oscillator */
@@ -408,8 +408,9 @@ static void fx_process(float *l, float *r)
             src = k;
             break;
         }
-    if (src != fx.src) {                          /* a source starts (or ends): its window in the history */
+    if (src != fx.src || (src>=FX_ST4 && src<=FX_ST32 && fx.beat!=fx_beat)) {
         fx.src = src;
+        fx.beat = fx_beat;
         if (src >= FX_ST4 && src <= FX_ST32) {    /* a 1/8 .. 1/64 note at the tempo, halved while too long */
             uint32_t n = fx_beat >> (2u + (src - FX_ST4));   /* half a beat at 44.1 kHz = a beat >> 2 at 22.05 */
             while (n > FX_HIST - 64u)
@@ -527,10 +528,10 @@ static void radio_render(int32_t *o, uint32_t n)
         }
         sam_capture(l,rr,fresh);
         if(playing && fx_mode) fx_process(&l,&rr);
+        sam_monitor(&l,&rr);                     /* monitoring only: capture still receives the live source */
 
-        {   /* the sample over the live radio; editor auditions the clip alone */
+        {   /* Keep the live recording audible on every sampler/player page. */
             float sy = sam_next();
-            if(sam_active && sam_state==SAM_READY) l=rr=0;
             l = fm_clampf(l + sy, -1.0f, 1.0f);
             rr = fm_clampf(rr + sy, -1.0f, 1.0f);
         }

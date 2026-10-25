@@ -86,6 +86,7 @@
 #include <math.h>
 #include <time.h>
 #define __attribute__(x)
+#include "app.h"
 
 /* ------------------------------------------------------------ screen --- */
 static uint16_t fb[240 * 240];          /* RGB565, byte-swapped as the panel takes it (gfx.c) */
@@ -100,6 +101,9 @@ static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
 {
     uint32_t i, j;
     uint16_t sc = (uint16_t)(((c >> 8) & 0xFFu) | ((c & 0xFFu) << 8));
+#ifdef APP_SCREEN_STREAM
+    app_screen_fill(x,y,w,h,c);
+#endif
 #if FM1B_MIRROR
     if (mirror_on && w && h && x < 240u && y < 240u)
         mirror_fill(x, y, x + w > 240u ? 240u - x : w, y + h > 240u ? 240u - y : h, c);
@@ -113,6 +117,9 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
 {
     uint32_t i, j;
     blits++;
+#ifdef APP_SCREEN_STREAM
+    app_screen_blit(x,y,w,h,px);
+#endif
     for (j = 0; j < h; j++)
         for (i = 0; i < w; i++)
             if (x + i < 240u && y + j < 240u)
@@ -632,6 +639,9 @@ static int ann_wire_send(const uint8_t *p, uint32_t n)
 #endif
 #ifdef APP_BTDEV
 #include "btdev.c"
+#endif
+#ifdef APP_SCREEN_STREAM
+#include "screen_stream.c"
 #endif
 #include "app.c"
 

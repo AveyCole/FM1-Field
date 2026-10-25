@@ -110,7 +110,13 @@ static volatile uint32_t fm1_ms;  /* milliseconds since boot (TIMER4-based, TIME
 #ifndef FM1B_CPU2
 #define FM1B_CPU2 0
 #endif
+#ifdef APP_SCREEN_STREAM
+#define FELUCCA_MIRROR 1
+#define FELUCCA_MIRROR_RING_DYNAMIC 1
+#define MRQ PLAT_SCREEN_RING
+#else
 #define FELUCCA_MIRROR FM1B_MIRROR /* usb.c's ring for mirror.c's frames */
+#endif
 #define SXQ 128u                  /* the SysEx send ring, in packets: a whole screen-reader SAY (ANN_MAX + 9 bytes) */
 #include "usb.c"
 #ifndef FM1B_TRS

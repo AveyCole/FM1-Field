@@ -8,6 +8,8 @@
 enum {SAM_EMPTY,SAM_CAPTURE,SAM_READY};
 static uint8_t *sam_data;
 static volatile uint8_t sam_active,sam_state,sam_voice,sam_gate;
+static volatile uint8_t sam_muted;
+static float sam_monitor_level=1;
 static volatile uint32_t sam_len;
 static uint8_t sam_start,sam_end=127,sam_level=110,sam_loop,sam_div,sam_slice;
 static int8_t sam_pitch,sam_oct;
@@ -61,6 +63,14 @@ static int sam_sample(unsigned pos)
 static void sam_init(void *buffer)
 {
  sam_data=buffer;sam_state=SAM_EMPTY;sam_len=0;sam_voice=sam_gate=0;sam_active=0;
+ sam_muted=0;sam_monitor_level=1;
+}
+static void sam_monitor(float *l,float *r)
+{
+ float target=sam_active && sam_muted?0.0f:1.0f;
+ if(sam_monitor_level<target) sam_monitor_level=fm_minf(target,sam_monitor_level+1.0f/220.0f);
+ else if(sam_monitor_level>target) sam_monitor_level=fm_maxf(target,sam_monitor_level-1.0f/220.0f);
+ *l*=sam_monitor_level;*r*=sam_monitor_level;
 }
 static void sam_enter(void) {sam_active=1;}
 static void sam_finish(void)

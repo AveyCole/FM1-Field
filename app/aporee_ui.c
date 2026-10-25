@@ -244,7 +244,9 @@ static void ui_home(void)
     {
         static const char *const messages[]={"SEL details","Favorite saved","Already saved","Favorites full",
             "Wait for a sound","Save failed","Favorite removed","Not enough memory"};
-        ap_left(6,ap_fav_status && (int32_t)(ap_fav_until-plat_ms())>0?messages[ap_fav_status]:ap_fetching?s:"SEL details",K_DIM);
+        if((int32_t)(tempo_shown_until-plat_ms())>0) {
+            snprintf(s,sizeof s,"%u BPM",(unsigned)tempo_bpm);ap_left(6,s,K_CORAL);
+        } else ap_left(6,ap_fav_status && (int32_t)(ap_fav_until-plat_ms())>0?messages[ap_fav_status]:ap_fetching?s:"SEL details",K_DIM);
     }
     ap_globe();
     ui_row(13,214,26,"REC save","SEQ favorites",K_DIM,K_DIM,K_PANEL);

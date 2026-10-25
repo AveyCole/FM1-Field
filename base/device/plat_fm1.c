@@ -167,6 +167,36 @@ void plat_unlock(uint32_t f)
     }
 }
 void plat_sysex_send(const uint8_t *frame, uint32_t n) { ota_wire_send(frame, n); }
+#ifdef APP_SCREEN_STREAM
+uint32_t plat_screen_memory(void)
+{
+    extern uint32_t shim_heap_used;
+    extern const uint32_t shim_heap_size;
+    return shim_heap_used<shim_heap_size?shim_heap_size-shim_heap_used:0;
+}
+int plat_screen_link(void) {return usb.config && !usb.suspended?(int)(midi_links&0x7FFFFFFFu):-1;}
+void plat_screen_attach(uint8_t *ring)
+{
+    uint32_t f=irq_save();mr_r=mr_w=0;tx_mid=0;mr_q=ring;irq_restore(f);
+}
+void plat_screen_detach(void)
+{
+    uint32_t f=irq_save();mr_r=mr_w=0;tx_mid=0;mr_q=0;irq_restore(f);
+}
+uint32_t plat_screen_room(void) {return mr_q?MRQ-(mr_w-mr_r):0;}
+int plat_screen_send(const uint8_t *p,uint32_t n)
+{
+    uint32_t i,w=mr_w;
+    if(n>plat_screen_room()) return -1;
+    for(i=0;i<n;i++) mr_q[(w+i)%MRQ]=p[i];
+    RING_PUBLISH();mr_w=w+n;return 0;
+}
+int plat_screen_reply(const uint8_t *p,uint32_t n)
+{
+    if(sx_busy || SXQ-(so_w-so_r)<(n+2u)/3u) return -1;
+    return ota_wire_send(p,n);
+}
+#endif
 
 /* the data area and its two more windows (plat.h): read through the unencrypted XIP window (main_fm1.c
  * fl_plain_window_init, from 0x93000 up); erased and written by felucca-bsp's RAM driver (FL_RANGE_OK: the store, its

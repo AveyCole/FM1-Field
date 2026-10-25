@@ -63,7 +63,8 @@ SIZES = FONTSETS[FONTSET]
 # them (fm1.toml font_full; the others keep the set's range)
 FULL = set(os.environ.get("FM1_FONT_FULL", "").split())
 SIZES = [(n, f, px, sc, pix, first, 126 if n in FULL else last) for n, f, px, sc, pix, first, last in SIZES]
-PAD = 2
+PAD = int(os.environ.get("FM1_FONT_PAD", "2"))
+assert 1 <= PAD <= 2
 
 
 def upscale(px_, w, h, scale):

@@ -588,7 +588,7 @@ const log = (t) => {
   if (atEnd) el.scrollTop = el.scrollHeight;
 };
 let image = null, boot = null;
-const meta = {"version": "0.1.7-alpha", "product": "FM-1_84000107", "pkg": new URL("firmware/field-0.1.7-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
+const meta = {"version": "0.1.8-alpha", "product": "FM-1_84000108", "pkg": new URL("firmware/field-0.1.8-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
 
 /* the backup: a requirement before every install; the link where the site has the backup page */
 document.querySelectorAll(".baklink").forEach((a) => { a.hidden = !meta.backup; });
@@ -651,9 +651,20 @@ function confirmed(withBoot) {
   return new Promise((r) => d.addEventListener("close", () => r(d.returnValue === "go"), { once: true }));
 }
 
+async function releaseDisplayViewer() {
+  if(typeof BroadcastChannel==='undefined') return;
+  const channel=new BroadcastChannel('field-midi-owner');
+  await new Promise(resolve=>{
+    const timer=setTimeout(resolve,1200);
+    channel.onmessage=event=>{if(event.data?.type==='released'){clearTimeout(timer);resolve();}};
+    channel.postMessage({type:'installer'});
+  });
+  channel.close();
+}
 async function run(img, product, isStock, sha256) {
   const withBoot = !isStock && !!boot && $("mboot").checked;
   if (!(await confirmed(withBoot))) return;
+  await releaseDisplayViewer();
   let midi;
   try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
   catch (e) { sayK("denied"); return; }

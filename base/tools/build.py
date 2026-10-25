@@ -231,7 +231,8 @@ def generate():
     tools = SRC / "tools"
     for c in [[tools / "gen_font.py", GEN / "felucca_font.h"],
               [tools / "gen_words.py", APP / CONF.get("words", "words.tsv"), APP / "web" / "words", GEN / "ann_words.h"]]:
-        env = {**os.environ, "FM1_FONT_FULL": " ".join(CONF.get("font_full", []))}
+        env = {**os.environ, "FM1_FONT_FULL": " ".join(CONF.get("font_full", [])),
+               "FM1_FONT_PAD": str(CONF.get("font_pad", 2))}
         r = subprocess.run([sys.executable, *map(str, c)], capture_output=True, text=True, env=env)
         sys.stdout.write(r.stdout)
         if r.returncode:

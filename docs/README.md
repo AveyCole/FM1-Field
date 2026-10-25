@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.7-alpha
+# FIELD — experimental 0.1.8-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.7-alpha
+  python3 base/tools/build.py app --release 0.1.8-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -288,8 +288,9 @@ K3 transposes, K4/SELECT set level, OCT transposes by octaves, SEL toggles loop,
 PLAY auditions/stops, and both the player and ARP keyboards play the same clip.
 C4 is original pitch. Playback is monophonic; one shots continue after key release,
 loops release when their triggering key is lifted. Short fades soften boundaries.
-In ARP, a ready clip is auditioned without the live radio; on the player it is
-mixed over the live radio. The former optional synth is no longer in the UI.
+As of 0.1.8, the live radio is monitored in ARP as well as on the player.
+ALGORITHM left mutes its monitor in ARP; right restores it. Capture and sample
+playback remain available. The former optional synth is no longer in the UI.
 
 ENV opens a separate live-effects page. Its white keys retain the original 16
 effects; FX taps tempo. Entering ENV explicitly clears any temporary clip and
@@ -358,3 +359,49 @@ cover latched playback across navigation, stop/retrigger controls, all 27 slices
 trimmed coverage, bounds and existing capture behavior. Contextual OCT, favorites,
 streaming crypto and scheduler regressions pass. Build checks pass: image 580032 B; RAM .data+.bss 130592 B of 131072; pool 308880 B of 311296.
 Hardware USB recovery and playback still need a physical-device test.
+
+## Sampler monitoring, quieter screen, tap tempo and USB display (0.1.8)
+
+ARP now retains the live recording by default. ALGORITHM left mutes only its
+monitor; right restores it, with a 220-sample gain ramp. Capture taps the real
+decoded source before this gain, so recording still works while muted. Sample
+playback remains audible. The mute is scoped to ARP, remembered when reopening
+the editor, and reset on boot. The UI replaces the key activity display and
+large knob cells with static original forest/river artwork, a monitor status
+line and four compact knob readouts. Keyboard playing and all SEL modes remain.
+
+FX taps work on every page. ENV shows BPM permanently, HOME briefly shows it
+after taps, and the FX LED pulses on the beat. The stutter history window is
+recomputed when tempo changes while its key stays down; previously it retained
+the old timing until retriggered.
+
+The optional docs/mirror viewer subscribes with F0 7D 57 60 OP F7 (0 stop,
+1 subscribe/heartbeat, 2 refresh). Device output uses packed-7-bit 00 59 pixel
+messages: 50 hello, 51 RGB565 runs, 52 fill. Queue and scratch are allocated as
+one 3,928-byte heap object only after a viewer connects, retaining at least
+8 KiB spare heap. A 2 KiB low-priority USB queue never blocks the main loop;
+row-progress caches retry incomplete strips. Disconnect, link changes and a
+six-second heartbeat timeout free the object. Firmware update entry frees it
+too. The original larger platform mirror remains disabled: this custom
+pixel-only path enables only its USB queue transport. Screen contents are
+read-only. The browser validates bounds, packet length and checksum before
+applying pixels. Its Disconnect, back link and page exit release MIDI ports;
+the installer also requests release with a same-origin BroadcastChannel.
+
+This requires a computer to supply monitor video or OBS window capture, not a
+USB-C video cable directly from the FM-1. It is not a UVC webcam. Physical USB
+throughput, driver behavior and playback still require a real-device test.
+No network or PCM buffer is reduced. The firmware remains in its original
+flash slot. Reducing transparent font padding from two pixels to one saves
+flash without altering a visible glyph pixel or its advance: the padding test
+checks every printable glyph in all three used font faces.
+
+Tests verify live audio with a ready sample, monitor silence, audible sample
+playback and successful capture while muted, restoring the live stream on exit,
+held stutter timing and BPM on player/ENV, and existing sampler controls. The
+USB stream is decoded by the actual viewer decoder and compared with all
+57,600 LCD pixels on player, sampler and effects pages, including queue-full
+retries, memory refusal and heartbeat timeout. Viewer tests cover subscription,
+rendering and releasing native ports for installation. Streaming crypto and
+scheduler, updater recovery and real-loader flash safety regressions pass.
+Build checks: image 578560 B; RAM .data+.bss 130656 B of 131072; pool 308884 B of 311296. Hardware behavior is not yet confirmed.

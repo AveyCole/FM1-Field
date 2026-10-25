@@ -8,10 +8,20 @@ app/build/tests/sampler_test
 cc -O1 tests/loader_link_test.c -o app/build/tests/loader_link_test
 app/build/tests/loader_link_test
 "${PYTHON:-python3}" base/tools/build.py app --host
+"${PYTHON:-python3}" tests/font_padding_test.py
 app/build/host/field_host tests/field_startup.host app/build/tests
 app/build/host/field_host tests/field_octaves.host app/build/tests
 if [ -n "${APOREE_TEST_STREAM:-}" ]; then
     app/build/host/field_host tests/field_sampler.host app/build/tests
+    app/build/host/field_host tests/field_tempo.host app/build/tests
+    app/build/host/field_host tests/field_sampler_audio.host app/build/tests
+    app/build/host/field_host tests/field_display.host app/build/tests
+    if command -v node >/dev/null 2>&1; then
+        node tests/screen_stream_test.mjs
+        node tests/viewer_test.mjs
+    else
+        echo "Run node tests/screen_stream_test.mjs and node tests/viewer_test.mjs after this script."
+    fi
 else
     echo "MP3 capture UI test skipped: set APOREE_TEST_STREAM to a long MP3 fixture."
 fi

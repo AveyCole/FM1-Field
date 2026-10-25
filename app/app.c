@@ -390,7 +390,7 @@ static void ui_piano(int slot, uint32_t y, int layer, uint32_t held)
     if (w_eq(ui_key[slot], key))
         return;
     memcpy(ui_key[slot], key, sizeof key);
-    cv_begin(240, (uint32_t)wh + 2u, K_BG);
+    cv_begin(240, (uint32_t)wh + (layer<0?0u:2u), K_BG);
     for (k = 0; k < 27; k++)                      /* white keys first, then the black ones over them */
         if (!BLACK[k % 12]) {
             char t[3] = {layer < 0 ? 0 : pw_char(k, layer), 0, 0};
@@ -439,6 +439,7 @@ static void ui_pass(void)
 }
 
 #include "aporee_ui.c"
+#include "field_screen.c"
 
 static void ui_page_set(int pg);
 
@@ -456,9 +457,10 @@ static void effects_open(void)
 }
 static void ui_effects(void)
 {
-    unsigned k;const char *name=ui_msg[0]?ui_msg:"White keys / hold for FX";
+    char bpm[16];unsigned k;const char *name=ui_msg[0]?ui_msg:"White keys / hold for FX";
     for(k=0;k<FX_N;k++) if(fx_held>>k&1u) {name=FX_NAME[k];break;}
-    ui_title(0,"Effects","Live FX");
+    snprintf(bpm,sizeof bpm,"%u BPM",(unsigned)tempo_bpm);
+    ui_title(0,"Effects",bpm);
     ui_row(1,42,24,name,"",K_CORAL,K_DIM,K_BG);
     ui_row(2,70,24,"Keys 1-4","filter / crush",K_TEXT,K_DIM,K_BG);
     ui_row(3,94,24,"Keys 5-8","tempo stutters",K_TEXT,K_DIM,K_BG);
@@ -473,6 +475,7 @@ static int sam_knob(uint8_t *v,int32_t d)
     if(!d) return 0;
     x=x<0?0:x>127?127:x;*v=(uint8_t)x;return 1;
 }
+#include "field_landscape.c"
 static void ui_sampler(void)
 {
     char a[20],b[20],c[20],d[20],status[40];
@@ -481,13 +484,13 @@ static void ui_sampler(void)
     else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/SAM_RATE));
     else w_cpy(status,ui_msg[0]?ui_msg:"REC captures / 2.7s mono",sizeof status);
     ui_row(1,40,28,status,"",sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
+    ui_row(4,68,20,"ALGO",sam_muted?"LIVE MUTED":"LIVE ON",K_DIM,sam_muted?K_CORAL:K_TEAL,K_BG);
     snprintf(a,sizeof a,"%u%%",(unsigned)(sam_start*100u/127u));
     snprintf(b,sizeof b,"%u%%",(unsigned)(sam_end*100u/127u));
     snprintf(c,sizeof c,"%+d st",sam_pitch+12*sam_oct);
     snprintf(d,sizeof d,"%u%%",(unsigned)(sam_level*100u/127u));
-    ui_cell(2,8,76,"K1","START",a,0);ui_cell(3,120,76,"K2","END",b,0);
-    ui_cell(4,8,122,"K3","PITCH",c,0);ui_cell(5,120,122,"K4","LEVEL",d,0);
-    ui_piano(6,174,-1,sam_keys);
+    ui_landscape();
+    ui_sample_knobs(a,b,c,d);
     ui_row(13,214,26,"REC capture  SEL mode","ARP back",K_DIM,K_DIM,K_PANEL);
 }
 
@@ -586,6 +589,7 @@ static void wire_dump(void)
 int app_sysex(const uint8_t *p, uint32_t n)
 {
     uint32_t i;
+    if(n>=4u && p[0]==0x7Du && p[1]==0x57u && p[2]==0x60u) {screen_command(p[3]);return 1;}
     if (n < 3u || p[0] != 0x7Du || p[1] != 0x57u)
         return 0;
     switch (p[2]) {
@@ -644,6 +648,7 @@ void app_init(void)
 {
     /* Reserve the large stream buffers before WiFi's task allocations fragment the heap. */
     (void)radio_alloc();
+    screen_stop();
     sam_init(fx_hist);
     fx_mode=0;fx_held=0;
     rset_load();
@@ -654,7 +659,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     (void)master_q12;                             /* (radio_render reads MASTER itself) */
     radio_render(lr, n);
 }
-void app_panic(void) { radio_st = RS_OFF; }
+void app_panic(void) { radio_st = RS_OFF;screen_stop(); }
 void app_say(const char *a, const char *b)
 {
     snprintf(ui_msg, sizeof ui_msg, "%s %s", a ? a : "", b ? b : "");
@@ -681,7 +686,9 @@ static void input(void)
 {
     uint32_t now = plat_buttons(), down = now & ~btn_prev;
     int32_t turn = plat_enc(EN_SELECT);
+    int32_t algo = plat_enc(EN_ALGO);
     btn_prev = now;
+    if(down&(1u<<B_FX)) tempo_tap();
     /* Local octave/layer controls take precedence; elsewhere these always
      * request another sound without changing the screen being used. */
     if(ui_page!=PG_SYNTH && ui_page!=PG_PASS &&
@@ -801,6 +808,7 @@ static void input(void)
         }
     } else if (ui_page == PG_SYNTH) {
         int x;
+        if(algo) sam_muted=algo<0;
         if(down&(1u<<B_ENV)) {effects_open();return;}
         sam_knob(&sam_start,plat_enc(EN_K1));
         if(sam_start>125) sam_start=125;
@@ -824,7 +832,6 @@ static void input(void)
         }
         if(down&((1u<<B_HOME)|(1u<<B_ARP))) ui_page_set(ap_player_page());
     } else if(ui_page==PG_EFFECTS) {
-        if(down&(1u<<B_FX)) tempo_tap();
         if(down&(1u<<B_REC)) ap_fav_save();
         if((down&(1u<<B_SEQ)) && ap_fav_open()) {ui_page_set(PG_FAV);return;}
         if(down&(1u<<B_PLAY)) radio_toggle();
@@ -838,13 +845,27 @@ void app_input_only(void) { input(); }
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
-    if(strcmp(cmd,"splash")) return 0;
-    app_splash();return 1;
+    if(!strcmp(cmd,"splash")) {app_splash();return 1;}
+    if(!strcmp(cmd,"screen_mem")) {host_screen_available=(uint32_t)atoi(a);return 1;}
+    if(!strcmp(cmd,"screen")) {
+        if(!strcmp(a,"on")) {char path[512];snprintf(path,sizeof path,"%s/%s",plat_host_dir,b);host_screen_file(path);screen_command(2);}
+        else if(!strcmp(a,"off")) {screen_command(0);host_screen_file(0);}
+        else if(!strcmp(a,"refresh")) screen_command(2);
+        else if(!strcmp(a,"ping")) screen_command(1);
+        return 1;
+    }
+    return 0;
 }
 int app_expect(const char *what, int *got)       /* the host simulator's checks (the .host scripts in tests) */
 {
     int i, n = 0;
-    if (!strcmp(what, "page"))
+    if (!strcmp(what,"tempo_bpm")) *got=(int)tempo_bpm;
+    else if (!strcmp(what,"fx_len")) *got=(int)fx.len;
+    else if (!strcmp(what,"screen_on")) *got=screen!=0;
+    else if (!strcmp(what,"sam_muted")) *got=sam_muted;
+    else if (!strcmp(what,"screen_bytes")) *got=sizeof(field_screen_t);
+    else if (!strcmp(what,"screen_drops")) *got=screen?(int)screen->drops:0;
+    else if (!strcmp(what, "page"))
         *got = ui_page;
     else if (!strcmp(what, "ap_lat"))
         *got = ap_now.lat;
@@ -945,6 +966,8 @@ static void lights(void)
         lk=((1u<<NKEYS)-1u)&~plat_keys();
     }
     lb|=1u<<B_OCTDN|1u<<B_OCTUP;
+    lb&=~(1u<<B_FX);
+    if((plat_ms()-tempo_t0)%(60000u/tempo_bpm)<90u) lb|=1u<<B_FX;
     plat_leds(lb, lk);
 }
 
@@ -989,6 +1012,7 @@ static void host_net_poll(void);
 void app_loop(void)
 {
     main_loops++;
+    screen_step();
 #ifdef PLAT_HOST
     host_net_poll();
 #endif

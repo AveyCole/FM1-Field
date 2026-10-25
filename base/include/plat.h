@@ -200,6 +200,16 @@ int plat_store_size(uint32_t obj);                           /* its length in by
                                                                * wants it whole or not at all checks it first) */
 int plat_store_save(uint32_t obj, const void *src, uint32_t len);   /* 0 = ok */
 #define PLAT_STORE_MAX 3840u           /* bytes per object */
+#define PLAT_SCREEN_RING 2048u
+/* Optional app-owned screen stream: bounded, low-priority MIDI transport.
+ * The app supplies the ring and detaches it before releasing its memory. */
+uint32_t plat_screen_memory(void);
+int plat_screen_link(void);
+void plat_screen_attach(uint8_t *ring);
+void plat_screen_detach(void);
+uint32_t plat_screen_room(void);
+int plat_screen_send(const uint8_t *frame,uint32_t n);
+int plat_screen_reply(const uint8_t *frame,uint32_t n);
 /* The objects are the app's (app.h): an enum that includes OBJ_PANEL (the panel calibration, the platform's) and
  * ends with OBJ_NOBJ, and APP_STORE_MAP, each object's flash offset: two 4 KiB sectors (A/B) from there, inside the
  * data area (0x97000..0xDFFFF) or Felucca's settings sector pair at 0xFC000. An object's number is written in its

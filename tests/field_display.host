@@ -1,0 +1,29 @@
+wait 6000
+tap ARP
+shot field-sampler-quiet.png
+screen on sampler.syx
+expect screen_on 1
+expect screen_bytes <4097
+wait 3000
+expect screen_drops >0
+fbdump sampler.rgb
+screen off
+tap HOME
+screen on player.syx
+wait 3000
+fbdump player.rgb
+screen off
+tap ENV
+screen on effects.syx
+wait 3000
+fbdump effects.rgb
+screen off
+screen_mem 8000
+screen on low-memory.syx
+expect screen_on 0
+screen off
+screen_mem 1000000
+screen on timeout.syx
+wait 6100
+expect screen_on 0
+screen off

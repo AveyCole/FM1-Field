@@ -59,7 +59,7 @@
 <body>
 <main>
   <button type="button" class="lang" id="lang" lang="ja">日本語</button>
-  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>USB recovery, loop latch &amp; slices · 0.1.7-alpha</strong><br>0.1.7 improves discovery of running FIELD and update loaders, bounds stale MIDI port operations, and gives the new loader automatic USB reconnect recovery while idle. In ARP, SEL cycles One shot → Loop hold → Loop latch → Slice; Slice maps 27 sections across the keys. OCT skips on other pages while retaining sampler octave and WiFi typing controls. Software and build tests pass; USB recovery still needs a physical-device test. Leave FIELD running normally and press Install. Discovery waits up to 45 seconds and also accepts an already-running loader. Back up your projects first.</p>
+  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Sampler monitoring, tap tempo &amp; live display · 0.1.8-alpha</strong><br>0.1.8 brings a quieter sampler screen with nature artwork and compact knob labels. The live recording stays audible in ARP; turn ALGORITHM left to mute its monitor and right to restore it. Capture and sample playback still work while muted. FX tap tempo works across pages, shows BPM in ENV, and updates held stutters. An optional USB screen viewer runs on your computer. Software checks pass; physical-device testing is still needed. Leave FIELD running normally and press Install. Back up your projects first. <a href="../mirror/">Open live display</a>.</p>
   <p data-t="intro">Connect the FM-1 by USB, then press Install. It works in Chrome or Edge; the browser asks once to allow MIDI: allow it.</p>
   <p data-t="warn">Do not unplug the USB cable while writing.</p>
   <p class="small" data-t="direct"></p>
@@ -114,6 +114,6 @@
     Fonts: Barlow Semi Condensed (SIL OFL 1.1). M-VAVE and FM-1 are trademarks of their respective owners.<br>
     <span data-t="license"></span> <a href="https://github.com/AveyCole/FM1-Field" target="_blank" rel="noopener">FIELD source on GitHub<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
 </footer>
-<script type="module" src="../flasher.js?v=0.1.7-usb-recovery-1"></script>
+<script type="module" src="../flasher.js?v=0.1.8-display-1"></script>
 </body>
 </html>

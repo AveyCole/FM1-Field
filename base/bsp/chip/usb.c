@@ -223,7 +223,11 @@ static volatile uint32_t so_w, so_r;
 #ifndef MRQ
 #define MRQ 4096u
 #endif
+#ifdef FELUCCA_MIRROR_RING_DYNAMIC
+static uint8_t *mr_q;
+#else
 static uint8_t mr_q[MRQ];
+#endif
 static volatile uint32_t mr_w, mr_r;
 static uint8_t tx_mid;                                  /* 0 between messages, 2 a mirror frame half sent */
 #endif

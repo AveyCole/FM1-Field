@@ -8,6 +8,9 @@
 #include "plat.h"
 
 #define APP_NAME "FIELD"
+#define APP_SCREEN_STREAM
+void app_screen_blit(uint32_t x,uint32_t y,uint32_t w,uint32_t h,const uint16_t *pixels);
+void app_screen_fill(uint32_t x,uint32_t y,uint32_t w,uint32_t h,uint16_t color);
 #define APP_SPLASH
 void app_splash(void);
 #ifdef PLAT_HOST

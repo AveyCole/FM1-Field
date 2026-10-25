@@ -1,0 +1,45 @@
+wait 6000
+expect ap_playing 1
+tap ARP
+tap REC
+wait 3000
+expect sam_state 2
+expect sam_voice 0
+peakreset
+wait 500
+expect peak_db_min -65
+wav sampler-live.wav
+wait 500
+key 7 down
+wait 500
+key 7 up
+wavstop
+expect ap_playing 1
+turn ALGO -1
+expect sam_muted 1
+tap PLAY
+wait 20
+expect sam_voice 0
+peakreset
+wait 300
+expect peak_db_max -120
+shot field-sampler-muted.png
+tap REC
+wait 3000
+expect sam_state 2
+expect sam_len 21824
+peakreset
+key 7 down
+wait 300
+expect peak_db_min -65
+key 7 up
+turn ALGO 1
+expect sam_muted 0
+peakreset
+wait 300
+expect peak_db_min -65
+turn ALGO -1
+tap HOME
+peakreset
+wait 300
+expect peak_db_min -65

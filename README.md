@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.7-alpha](docs/firmware/field-0.1.7-alpha.fwsc)**
+[Download 0.1.8-alpha](docs/firmware/field-0.1.8-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.7 update improves USB discovery and loader reconnect recovery, adds latched loops and keyboard slices, and makes OCT skip on pages without local octave controls. It retains the network throughput and playback reserve improvements, battery indicator and updated USB flasher. Software checks pass; this build still needs physical-device testing.
+The 0.1.8 update adds a quiet sampler landscape, live monitoring with an ALGORITHM mute switch, repaired FX tap tempo with visible BPM, and an optional USB display viewer. It retains the streaming reserve and USB recovery work. Software checks pass; physical-device testing is still needed.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
@@ -39,6 +39,8 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | MASTER | Volume |
 | Keys | Play the captured sample on the player and in ARP; hold white keys for FX in ENV |
 | ARP | Sample editor: REC capture, PLAY audition, SEL cycles one shot / loop hold / loop latch / slice; K1 start, K2 end, K3 pitch, K4 level |
+| ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
+| FX | Tap tempo on any page; ENV displays BPM and the FX light marks the beat |
 | ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
 | EDIT | Toggle Near on the player; fixed 50 km neighborhood with a visible Near indicator |
 
@@ -54,8 +56,31 @@ transpose; keys use C4 as the original pitch. In Loop hold, releasing the trigge
 playing after release and across screens; tap its key again or PLAY in ARP to stop.
 Slice divides the trimmed range into 27 equal sections, one per key, at a common pitch.
 SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving ARP finishes capture.
+The live recording stays audible in ARP by default. Turn ALGORITHM left to mute
+its monitor and right to restore it. This switch does not mute the sample or
+stop capture. A short fade avoids an abrupt gain change. Leaving ARP restores
+the live recording; the editor remembers its switch until reboot.
+
 Clips are temporary: power-off, a new capture, or entering ENV clears them.
 ENV reuses the same 12 KiB for effects history; sample playback and FX are exclusive.
+
+The sampler uses a static landscape with four compact knob readouts and no
+keyboard activity display. Tap FX on any page to set tempo. ENV shows the BPM
+continuously; the player shows it briefly after tapping, and the FX LED pulses
+on the beat. A held stutter adopts a changed tempo immediately.
+
+[USB live display](https://aveycole.github.io/FM1-Field/mirror/) mirrors the
+240×240 screen in desktop Chrome or Edge. Connect with FIELD running normally.
+Move the computer window to a monitor or capture it in OBS; fullscreen and PNG
+save are provided. This is a read-only USB-MIDI pixel stream, not HDMI,
+DisplayPort or a UVC webcam. No direct USB-C monitor connection is supported.
+Its 3,928-byte heap object exists only while subscribed; at least 8 KiB of heap
+reserve must remain. Disconnect, cable removal or a six-second missing
+heartbeat releases it. The installer asks this site’s viewer to close its
+ports before taking USB ownership. Compressed audio and PCM buffers retain
+their previous sizes.
+
+![FIELD sampler](docs/images/field-sampler.png)
 
 Near is anchored when EDIT enables it and survives power-off. It does not drift
 with each skip. Its first selection scans the location index, potentially taking
@@ -85,10 +110,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.7-alpha
+  python3 base/tools/build.py app --release 0.1.8-alpha
 ```
 
-This produces `app/build/field-0.1.7-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.8-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

@@ -1,0 +1,28 @@
+wait 6000
+tap ENV
+key 7 down
+press FX
+release FX
+wait 746
+press FX
+release FX
+wait 10
+expect tempo_bpm 80
+expect fx_len 4134
+shot field-fx-tempo.png
+key 7 up
+tap HOME
+wait 2500
+press FX
+release FX
+wait 496
+press FX
+release FX
+expect tempo_bpm 120
+shot field-player-tempo.png
+tap ENV
+expect tempo_bpm 120
+key 7 down
+wait 10
+expect fx_len 5512
+key 7 up
