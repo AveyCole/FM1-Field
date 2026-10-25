@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.9-alpha
+# FIELD — experimental 0.1.10-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.9-alpha
+  python3 base/tools/build.py app --release 0.1.10-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -447,3 +447,41 @@ stream crypto and scheduler checks pass. Loader simulation checks the exact
 package, writes only permitted flash windows, preserves the flash head and
 refuses damage. Build checks: image 581328 B; RAM .data+.bss 130688 B of 131072; pool 308884 B of 311296.
 Physical-device audio, CPU timing and USB behavior still require testing.
+
+## One persistent sample slot (0.1.10)
+
+SAVE in ARP stores the current ADPCM clip and trim start/end, level, tuning,
+octave, playback mode and slice count. During capture it first finishes the
+partial recording; an empty/too-short clip reports Capture a sample first.
+The display reports Sample saved only after verified programming and commit.
+The saved clip is restored at boot and when entering ARP with an empty clip,
+including after ENV used its RAM for live FX. FX is disabled before restoration
+touches that shared memory. New unsaved captures leave the saved slot unchanged.
+The stored clip is dry source audio, as before; filter/monitor settings are not
+part of it. A save replaces one logical slot and briefly interrupts sound.
+
+The slot uses two 16 KiB banks at 0x97000 and 0x9B000, ending at 0x9F000, in
+the unused former Radio Garden table space. FIELD's region catalogue is compiled
+into its code. This does not overlap settings, favorites or OTA staging. Only
+the inactive bank is erased, followed by payload programming/readback verification
+and a final CRC-protected header commit. Both header and audio CRCs, lengths,
+all edit bounds and ADPCM index bounds are validated on load. The newest valid
+sequence wins, with wrap handling and fallback to the earlier bank. A failed or
+interrupted replacement retains the previous version. Normal FIELD loader
+installs exclude this entire data window, including bytes resembling AT records.
+Other firmware and explicit user-data erases may use or clear this space.
+
+No new audio bank or permanent RAM reserve is allocated. To fit the new code in
+the original flash slot, bitmap font data omits transparent rows at the bottom
+of each glyph. Per-glyph row counts retain the original advance, line height,
+and every visible pixel; custom fonts without row counts keep their old behavior.
+All three used font faces pass exact raster/advance checks, and the filter PNG
+is byte-identical before/after this font packing change.
+
+Tests cover exact audio and settings restore, replacement, unsaved captures,
+reboot, restoring after FX, replay, erase/payload cuts, every incomplete header
+length, damaged-newest fallback, invalid-bank bounds and sequence wrap. Loader
+tests seed both sample banks, including AT-like bytes, and verify preservation
+through install and reinstall. Existing sampler, monitor, filter, favorites,
+regions, pixel mirror, USB recovery, streaming crypto and scheduler checks pass.
+Build checks: image 578912 B; RAM .data+.bss 130688 B of 131072; pool 308884 B of 311296. Physical saving/reboot/playback still needs a device test.

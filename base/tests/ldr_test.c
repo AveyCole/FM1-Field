@@ -136,6 +136,7 @@ int main(int argc, char **argv)
 {
     size_t olen;
     uint8_t *old, head[0x4000];
+    static uint8_t sample_banks[0x8000];
     uint32_t ofo, nfo;
     int bad = 0, rc;
     if (argc < 3) { printf("usage: ldr_test OLD.fwsc NEW.fwsc\n"); return 2; }
@@ -152,6 +153,10 @@ int main(int argc, char **argv)
         r[2] = 0x0D; r[3] = 0x5A; r[4] = 0x01; r[5] = 0x5A; r[6] = 0x41; r[7] = 0x54;
         ota_wr16(r, ota_crc16(r + 2, 78, 0));
         memcpy(nor + 0xE4F00, r, sizeof r);
+        for (uint32_t i = 0; i < sizeof sample_banks; i++) nor[0x97000+i]=(uint8_t)(i*17u);
+        /* Even record-like sample bytes in the data window must be skipped. */
+        memcpy(nor + 0x97F00, r, sizeof r);
+        memcpy(sample_banks,nor+0x97000,sizeof sample_banks);
     }
     rc = ldr_session();
     printf("  rc %d, %u requests, %u sector erases\n", rc, requests, erases);
@@ -161,10 +166,12 @@ int main(int argc, char **argv)
     bad += check("finish asked (0xF0000000)", f0_asked >= 1);
     bad += check("update record cleared (RAM + flash)", record_cleared && nor[0xE4F06] == 0xFF);
     bad += check("no write outside the allowed windows", bad_range == 0);
+    bad += check("saved sample banks unchanged (including AT-like data)", !memcmp(sample_banks,nor+0x97000,sizeof sample_banks));
     /* same package again: nothing to erase */
     erases = 0; requests = 0;
     rc = ldr_session();
     bad += check("re-run with the same package erases nothing", rc == 0 && erases == 0);
+    bad += check("sample banks survive reinstall", !memcmp(sample_banks,nor+0x97000,sizeof sample_banks));
     /* a package for another chip key is refused before any erase */
     {
         uint8_t save = logical[nfo + 0x4000 + 5];

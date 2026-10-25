@@ -57,6 +57,7 @@ static const char *wifi_status_str(void)
 
 #include "synth.c"
 #include "sampler.c"
+#include "sample_store.c"
 
 /* ---- the station of the last session (OBJ_RADIO), and the synth's settings (saved before them: older saves
  * end at st_title, and load with the synth at its defaults) */
@@ -446,6 +447,11 @@ static void ui_page_set(int pg);
 /* ARP edits the same temporary sample played by the main keyboard. */
 static uint32_t sam_keys;
 static int8_t sam_key=-1;
+static void sampler_open(void)
+{
+    if(sam_state==SAM_EMPTY) {fx_mode=0;fx_held=fx_wire=0;(void)sam_restore();}
+    sam_enter();
+}
 static void effects_open(void)
 {
     int had_sample=sam_state!=SAM_EMPTY;
@@ -483,6 +489,7 @@ static void ui_sampler(void)
     snprintf(mode,sizeof mode,"Slice / %u",(unsigned)sam_slices);
     ui_title(0,"Sampler",sam_loop==3?mode:sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
     if(sam_state==SAM_CAPTURE) snprintf(status,sizeof status,"Capturing %u%%",(unsigned)(sam_len*100u/SAM_FRAMES));
+    else if(ui_msg[0]) w_cpy(status,ui_msg,sizeof status);
     else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/SAM_RATE));
     else w_cpy(status,ui_msg[0]?ui_msg:"REC captures / 2.7s mono",sizeof status);
     ui_row(1,40,28,status,"",sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
@@ -493,7 +500,7 @@ static void ui_sampler(void)
     snprintf(d,sizeof d,"%u%%",(unsigned)(sam_level*100u/127u));
     ui_landscape(0);
     ui_knobs(labels,a,b,c,d);
-    ui_row(13,214,26,sam_loop==3?"PRESETS slices":"REC capture  SEL mode","ARP back",K_DIM,K_DIM,K_PANEL);
+    ui_row(13,214,26,sam_loop==3?"PRESETS slices":"REC capture  SEL mode","SAVE clip",K_DIM,K_DIM,K_PANEL);
 }
 
 static void ui_filter(void)
@@ -670,6 +677,7 @@ void app_init(void)
     (void)radio_alloc();
     screen_stop();
     sam_init(fx_hist);
+    (void)sam_restore();
     fil_init();
     fx_mode=0;fx_held=0;
     rset_load();
@@ -752,7 +760,7 @@ static void input(void)
             radio_toggle();
         if (down & (1u << B_ARP)) {
             if(!fx_hist) {ap_fav_notice(7);return;}
-            sam_enter();sam_keys=0;sam_key=-1;
+            sampler_open();sam_keys=0;sam_key=-1;
             ui_page_set(PG_SYNTH);
             return;
         }
@@ -854,6 +862,10 @@ static void input(void)
             if(sam_state==SAM_CAPTURE || radio_st==RS_PLAYING) {ui_msg[0]=0;sam_record();}
             else w_cpy(ui_msg,"Wait for PLAYING",sizeof ui_msg);
         }
+        if(down&(1u<<B_SAVE)) {
+            int rc;sam_finish();rc=sam_save();
+            w_cpy(ui_msg,rc==-2?"Capture a sample first":rc?"Sample save failed":"Sample saved",sizeof ui_msg);
+        }
         if(down&(1u<<B_PLAY)) {
             if(sam_voice) sam_gate=0;
             else {sam_note(sam_loop==3?53+sam_slice:60);sam_key=-1;}
@@ -869,14 +881,14 @@ static void input(void)
         if(down&(1u<<B_PLAY)) radio_toggle();
         if(down&(1u<<B_REC)) ap_fav_save();
         if((down&(1u<<B_SEQ)) && ap_fav_open()) ui_page_set(PG_FAV);
-        if(down&(1u<<B_ARP)) {sam_enter();ui_page_set(PG_SYNTH);}
+        if(down&(1u<<B_ARP)) {sampler_open();ui_page_set(PG_SYNTH);}
         if(down&(1u<<B_ENV)) effects_open();
     } else if(ui_page==PG_EFFECTS) {
         if(down&(1u<<B_REC)) ap_fav_save();
         if((down&(1u<<B_SEQ)) && ap_fav_open()) {ui_page_set(PG_FAV);return;}
         if(down&(1u<<B_PLAY)) radio_toggle();
         if(down&((1u<<B_ENV)|(1u<<B_HOME))) ui_page_set(ap_player_page());
-        if(down&(1u<<B_ARP)) {sam_enter();ui_page_set(PG_SYNTH);}
+        if(down&(1u<<B_ARP)) {sampler_open();ui_page_set(PG_SYNTH);}
     }
 }
 void app_input_only(void) { input(); }
@@ -1004,7 +1016,7 @@ static void lights(void)
     }
     if (ui_page == PG_SYNTH) {
         lb = 1u << B_HOME | 1u << B_ARP | 1u << B_OCTDN | 1u << B_OCTUP | 1u << B_SEL | 1u << B_PLAY | 1u << B_REC;
-        lb|=1u<<B_ENV;
+        lb|=1u<<B_ENV|1u<<B_SAVE;
         lk = ((1u << NKEYS) - 1u) & ~sam_keys;    /* the keys lit, the held ones off */
     }
     if(ui_page==PG_EFFECTS) {

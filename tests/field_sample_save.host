@@ -1,0 +1,55 @@
+wait 6000
+tap ARP
+tap SAVE
+expect sam_state 0
+tap REC
+wait 1200
+tap SAVE
+expect sam_state 2
+expect sam_len >8000
+expect sam_len <12000
+turn K1 4
+turn K3 5
+tap SEL
+tap SEL
+tap SEL
+turn PRESET -2
+expect sam_slices 8
+tap SAVE
+shot field-sample-saved.png
+reboot
+expect sam_state 2
+expect sam_pitch 5
+expect sam_loop 3
+expect sam_slices 8
+wait 6000
+tap HOME
+tap ARP
+expect page 6
+expect sam_len >8000
+expect sam_len <12000
+tap ENV
+expect sam_state 0
+tap ARP
+expect sam_state 2
+expect sam_pitch 5
+expect sam_slices 8
+tap REC
+wait 3000
+expect sam_len 21824
+reboot
+expect sam_len <12000
+wait 6000
+tap HOME
+tap ARP
+tap REC
+wait 3000
+tap SAVE
+reboot
+expect sam_len 21824
+tap HOME
+tap ARP
+key 7 down
+wait 100
+expect sam_voice 1
+key 7 up

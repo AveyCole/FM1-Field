@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.9-alpha](docs/firmware/field-0.1.9-alpha.fwsc)**
+[Download 0.1.10-alpha](docs/firmware/field-0.1.10-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.9 update adds a stereo filter with LFO modulation behind LFO, a river scene with compact knob readouts, and selectable sampler slice counts. Software checks pass; physical-device testing is still needed.
+The 0.1.10 update adds one saved sample slot on SAVE in ARP, preserving the clip and its edit settings across power cycles. Software checks pass; physical-device testing is still needed.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
@@ -31,7 +31,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | OCT− / OCT+ | Another recording from any page; ARP retains octave transposition and WiFi typing retains character layers |
 | REC | Save a favorite on the player / ENV; capture in ARP; remove in the favorites list |
 | SEQ | Open favorites; press again to return |
-| SAVE | Browse country → state/province → Play random here |
+| SAVE | In ARP: save/replace one persistent clip. On the player: browse country → state/province → Play random here |
 | SELECT / SEL | Move / open in the browser; SEL on the player shows author/licence details |
 | PLAY | Play / stop; start the highlighted region or favorite |
 | HOME | Up in the browser; worldwide random from the regional player |
@@ -60,14 +60,21 @@ Slice divides the trimmed range into 4, 8, 16 or 27 equal sections at a common
 pitch. PRESETS selects the count while in Slice mode; higher keys repeat the
 sequence when fewer than 27 slices are selected. It starts at 27 on boot.
 Changing the count stops the current sample voice and retains the clip.
-SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving ARP finishes capture.
+SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving ARP finishes capture without saving it.
 The live recording stays audible in ARP by default. Turn ALGORITHM left to mute
 its monitor and right to restore it. This switch does not mute the sample or
 stop capture. A short fade avoids an abrupt gain change. Leaving ARP restores
 the live recording; the editor remembers its switch until reboot.
 
-Clips are temporary: power-off, a new capture, or entering ENV clears them.
-ENV reuses the same 12 KiB for effects history; sample playback and FX are exclusive.
+Press **SAVE in ARP** to store one clip, including trim, pitch/octave, level,
+playback mode and slice count. SAVE during capture finishes it early and saves.
+The display confirms “Sample saved.” Another SAVE replaces this single slot.
+New captures and edits are temporary until saved. The saved clip restores at
+boot and when ARP is reopened with no clip after ENV reuses its RAM for FX.
+Sample playback and live FX still share the same 12 KiB and are exclusive.
+Saving briefly interrupts audio while the flash is programmed. Failed writes
+retain the previous saved version. Normal FIELD updates preserve the slot;
+restoring other firmware or erasing user data can overwrite it.
 
 The sampler uses a static landscape with four compact knob readouts and no
 keyboard activity display. Tap FX on any page to set tempo. ENV shows the BPM
@@ -131,10 +138,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.9-alpha
+  python3 base/tools/build.py app --release 0.1.10-alpha
 ```
 
-This produces `app/build/field-0.1.9-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.10-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.
