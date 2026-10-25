@@ -25,6 +25,7 @@ if [ -n "${APOREE_TEST_STREAM:-}" ]; then
     app/build/host/field_host tests/field_sample_save.host app/build/tests
     app/build/host/field_host tests/field_space.host app/build/tests
     app/build/host/field_host tests/field_sampler_space.host app/build/tests
+    app/build/host/field_host tests/field_fx_pages.host app/build/tests
     app/build/host/field_host tests/field_display.host app/build/tests
     if command -v node >/dev/null 2>&1; then
         node tests/screen_stream_test.mjs

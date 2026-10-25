@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.13-alpha
+# FIELD — experimental 0.1.14-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.13-alpha
+  python3 base/tools/build.py app --release 0.1.14-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -588,3 +588,41 @@ mapping, typing, delete, OCT layers and saved credentials are unchanged.
 Simulator screenshots were visually checked for lowercase, capitals,
 digits/symbols, simultaneous white/raised key highlights and typed password
 text. Hardware build checks pass: image 581328 B; RAM .data+.bss 130784 B of 131072; pool 308884 B of 311296. Sampler FX from 0.1.12 remains intact.
+
+
+## Separate Delay/Reverb controls and live send (0.1.14)
+
+SEL on the FX workspace switches Delay/Reverb without stopping either DSP,
+the sampler voice or a latched loop. Delay maps K1 division/free time, K2
+feedback up to 95%, K3 echo tone and K4 delay mix. Reverb maps K1 decay,
+K2 damping, K3 stereo width and K4 room mix. EDIT switches delay sync/free;
+PRESETS adjusts the existing shared BPM and FX still taps tempo. Divisions:
+1/32, 1/16T, 1/16, 1/16D, 1/8T, 1/8, 1/8D, 1/4T, 1/4, 1/4D and 1/2.
+
+SAVE toggles LIVE FX / LIVE DRY on either FX page. The dry live return stays
+outside Delay/Reverb when its send is disabled; samples still enter them.
+The live stream is not muted and existing tails decay. The sampler monitor
+gain is still applied before this routing, and LFO filtering remains after it.
+Independent effect mixes allow either direct wet contribution to be zeroed;
+ALGORITHM retains a smoothed global bypass.
+
+The 12 KiB bank is unchanged. Echo input is averaged over eight output frames
+and stored at 5.5125 kHz, doubling usable delay capacity to 720 ms. Free delay
+ranges from about 20 to 720 ms. Sync computes exact musical ratios, caps at the
+same maximum and displays LIMIT plus actual time. Reverb remains at 11.025 kHz
+with adjustable damping and width. Echo time glides; feedback and output writes
+remain bounded. No stream/PCM buffer reduction or audio allocation was added.
+
+Transparent rows above glyph ink are omitted as well as those below, freeing
+flash for these controls without changing advance, baseline or visible pixels.
+The optional font top-row table defaults to zero for existing custom faces.
+All printable XS/S/B glyphs are checked pixel-for-pixel, and the WiFi password
+screenshot is identical to 0.1.13 after this storage change.
+
+DSP tests cover 120 BPM straight/triplet/dotted timings, all 11 divisions,
+capacity limits, exact live dry-through with the send off, wet sampler tails,
+live-on tails, independent delay/room levels, mono width, bypass, 24 stability
+corners and memory guards. Host tests cover page switching, retained knobs,
+live routing toggle, sampler latch preservation, BPM/free/sync controls and
+navigation. Existing sampler, saved clip, filter and pixel-mirror tests pass.
+Hardware checks: image 578496 B; RAM .data+.bss 130784 B of 131072; pool 308884 B of 311296. Physical-device audio testing is still needed.

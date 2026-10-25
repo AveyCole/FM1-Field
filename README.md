@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.13-alpha](docs/firmware/field-0.1.13-alpha.fwsc)**
+[Download 0.1.14-alpha](docs/firmware/field-0.1.14-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.13 update restores contrast on WiFi password keyboard labels, including capitals, symbols and pressed keys. Sampler delay/reverb and its FX hold shortcut remain available. Simulator screens have been checked; physical-device testing is still needed.
+The 0.1.14 update adds separate Delay/Reverb controls, straight/dotted/triplet divisions and a live FX send toggle while keeping sampler playback processed. Audio, routing, navigation and screen checks pass; physical-device testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -28,8 +28,8 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | OCT− / OCT+ | Another recording from any page; ARP retains octave transposition and WiFi typing retains character layers |
 | REC | Save a favorite on the player / ENV; capture in ARP; remove in the favorites list |
 | SEQ | Open favorites; press again to return |
-| SAVE | In ARP: save/replace one persistent clip. On the player: browse country → state/province → Play random here |
-| SELECT / SEL | Move / open in the browser; SEL on the player shows author/licence details |
+| SAVE | In ARP: save/replace one persistent clip. On the player: browse regions. On Delay/Reverb: toggle live FX send |
+| SELECT / SEL | Move / open in the browser; player shows credits; FX switches Delay / Reverb |
 | PLAY | Play / stop; start the highlighted region or favorite |
 | HOME | Up in the browser; worldwide random from the regional player |
 | GLO | WiFi setup (2.4 GHz) |
@@ -39,7 +39,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | PRESETS in ARP Slice | Select 4, 8, 16 or 27 equal slices of the trimmed clip; fewer slices are longer |
 | LFO | Open the filter page; press again or HOME to return to the player |
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
-| FX | Short tap sets tempo; hold 450 ms on HOME, the regional player or ARP to open Echo + Room |
+| FX | Short tap sets tempo; hold 450 ms on HOME, the regional player or ARP to open Delay/Reverb |
 | PRESETS on either FX page | Set the shared BPM, 40–240; header displays it |
 | ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
 | EDIT | Toggle Near on the player; fixed 50 km neighborhood with a visible Near indicator |
@@ -108,36 +108,41 @@ needs a small amount of state and shares no sample/FX audio memory.
 
 ![FIELD river filter](docs/images/field-filter.png)
 
-Hold FX on the home screen, regional player or ARP sampler for 450 ms to open
-**Echo + Room**. A shorter press is still a tempo tap, timed from the press
-rather than release. A hold does not add a tempo tap. Other pages retain tap
-tempo. PRESETS adjusts the shared BPM on both Echo + Room and ENV's FX page;
-turning it clears the old tap history before a new tapping sequence.
+Hold **FX** on HOME, the regional player or ARP for 450 ms to open the
+Delay/Reverb workspace. Short FX taps still set tempo. **SEL** switches between
+its two pages; both effects continue running. **ARP** returns to the sampler
+without clearing the clip or interrupting a latched loop. The keyboard works
+on both FX pages. HOME returns to the player; PRESETS adjusts BPM from 40–240.
 
-K1 sets delay time, K2 feedback, K3 room decay, and K4/SELECT wet mix. EDIT toggles
-free delay (20–360 ms) and tempo sync (1/8, 1/4, 1/2 or 1 beat). The actual delay
-time is displayed; synced values exceeding 360 ms are limited and marked
-`SYNC / LIMIT`. ALGORITHM left bypasses, right enables. HOME returns to the
-player while the combo continues. FX still taps tempo on the combo page.
-Tails continue after stopping the source and decay naturally. The dry stereo
-audio stays full rate; the warm echo/room path runs at 11.025 kHz.
+| Page | K1 | K2 | K3 | K4 / SELECT |
+| --- | --- | --- | --- | --- |
+| Delay | Division / free time | Feedback, 0–95% | Echo tone | Delay mix |
+| Reverb | Decay | High-frequency damping | Stereo width | Reverb mix |
 
-The combo preserves the sampler's clip and processes its playback. ENV clears
-the combo's tail and opens the original exclusive held-key FX. Save a clip before
-entering ENV. The independent LFO filter can still process the combo output.
-OCT continues to skip in place outside ARP, REC/SEQ keep their favorites
-functions on the FX page, and GLO opens WiFi.
+**EDIT** switches the delay between tempo sync and free time. Divisions are
+1/32, 1/16T, 1/16, 1/16D, 1/8T, 1/8, 1/8D, 1/4T, 1/4, 1/4D and 1/2.
+T means triplet; D means dotted. The actual time appears above the artwork.
+Free time spans roughly 20–720 ms; synced settings exceeding that capacity
+show **LIMIT** and the actual capped time. At 120 BPM a quarter note is 500 ms;
+a dotted quarter needs 750 ms and is limited to 720 ms.
 
-![FIELD Echo + Room](docs/images/field-space.png)
+**SAVE** toggles the live recording's send to both effects. **LIVE DRY** keeps
+the live stream audible and dry while sample playback still enters Delay and
+Reverb. **LIVE FX** processes both. Existing tails decay naturally after the
+send is turned off. This controls Delay/Reverb; the separate LFO filter still
+processes the output. ARP's ALGORITHM live-monitor mute is retained while
+editing FX. On either FX page ALGORITHM bypasses/enables both effects. Set an
+effect's own mix to zero to hear only the other one.
 
-Hold **FX in ARP** for 450 ms to open Echo + Room. Playback, latched loops,
-the live-monitor mute and the clip survive the transition. Play the keyboard
-on the FX page; press ARP to return to editing with the effect running. Echo +
-Room processes the sample/live mix before the LFO filter. Its separate 12 KiB
-buffer is allocated on demand only when at least 24 KiB of heap will remain;
-otherwise “FX memory low” leaves the current sample and page intact. Existing
-stream/PCM buffers retain their sizes. ENV releases this buffer for its separate
-held-key mode.
+The effects retain a separate 12 KiB bank, allocated only when 24 KiB of heap
+will remain. “FX memory low” leaves the clip and current page intact. Stream
+and PCM buffers keep their sizes. The echo now runs at 5.5125 kHz to double its
+available duration; the room stays at 11.025 kHz and dry audio at 44.1 kHz.
+ENV frees this bank and opens the original exclusive held-key mode, which
+clears an unsaved sample. Save a clip before entering ENV.
+
+![FIELD Delay](docs/images/field-delay.png)
+![FIELD Reverb](docs/images/field-reverb.png)
 
 Near is anchored when EDIT enables it and survives power-off. It does not drift
 with each skip. Its first selection scans the location index, potentially taking
@@ -167,10 +172,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.13-alpha
+  python3 base/tools/build.py app --release 0.1.14-alpha
 ```
 
-This produces `app/build/field-0.1.13-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.14-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

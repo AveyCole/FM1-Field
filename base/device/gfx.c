@@ -12,7 +12,8 @@ typedef struct {               /* proportional, see tools/gen_font.py */
     const uint8_t *bw;         /* bitmap width per glyph (starts FONT_PAD left of the pen) */
     const uint16_t *off;       /* byte offset of each glyph */
     const uint8_t *data;
-    const uint8_t *rows;       /* optional per-glyph ink rows; omitted rows are transparent */
+    const uint8_t *rows;       /* optional per-glyph ink end row; omitted rows are transparent */
+    const uint8_t *tops;       /* optional first ink row, preserving the original baseline */
 } felucca_font_t;
 #include "felucca_font.h"
 
@@ -161,9 +162,9 @@ static int32_t cv_text(int32_t x, int32_t y, const felucca_font_t *f, const char
         w = f->bw[gi];
         bpr = (w + 1u) / 2u;
         gd = f->data + f->off[gi];
-        for (gy = 0; gy < (f->rows ? f->rows[gi] : f->h); gy++)
+        for (gy = f->tops ? f->tops[gi] : 0; gy < (f->rows ? f->rows[gi] : f->h); gy++)
             for (gx = 0; gx < w; gx++) {
-                uint32_t a = gd[gy * bpr + gx / 2u];
+                uint32_t a = gd[(gy - (f->tops ? f->tops[gi] : 0)) * bpr + gx / 2u];
                 int32_t px = x - f->pad + (int32_t)gx, py = y + (int32_t)gy + cv_oy;
                 a = (gx & 1u) ? (a & 15u) : (a >> 4);
                 if (!a || (uint32_t)px >= cv_w || py < cv_y0 || py >= cv_y1)

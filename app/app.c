@@ -538,17 +538,22 @@ static void space_open(void)
 }
 static void ui_space(void)
 {
-    static const char *const labels[]={"K1 DELAY","K2 FEED","K3 ROOM","K4 MIX"};
-    char a[16],b[16],c[16],d[16],bpm[16];
-    snprintf(bpm,sizeof bpm,"%u BPM",(unsigned)tempo_bpm);ui_title(0,"Echo + Room",bpm);
-    ui_row(1,42,24,"ALGO",space_on?"ON":"BYPASS",K_DIM,K_CORAL,K_BG);
-    ui_row(4,68,20,"PRESETS BPM",space_sync?space_wanted()>3969?"SYNC / LIMIT":"SYNC":"FREE",K_DIM,K_TEAL,K_BG);
-    snprintf(a,sizeof a,"%ums",space_frames()*1000u/11025u);
-    snprintf(b,sizeof b,"%u%%",(unsigned)space_feedback*100u/127u);
-    snprintf(c,sizeof c,"%u%%",(unsigned)space_room*100u/127u);
-    snprintf(d,sizeof d,"%u%%",(unsigned)space_mix*100u/127u);
-    ui_landscape(1);ui_knobs(labels,a,b,c,d);
-    ui_row(13,214,26,"EDIT sync  FX tap","HOME back",K_DIM,K_DIM,K_PANEL);
+    static const char *const delay[]={"K1 TIME","K2 FEED","K3 TONE","K4 MIX"};
+    static const char *const room[]={"K1 DECAY","K2 DAMP","K3 WIDTH","K4 MIX"};
+    char a[16],b[16],c[16],d[16],bpm[16],status[28];
+    unsigned ms=(space_frames()*400u+1102u)/2205u;
+    snprintf(bpm,sizeof bpm,"%u BPM",(unsigned)tempo_bpm);ui_title(0,space_page?"FX / Reverb":"FX / Delay",bpm);
+    ui_row(1,42,24,space_on?"ALGO / ON":"ALGO / BYPASS",space_live?"LIVE FX":"LIVE DRY",K_DIM,K_CORAL,K_BG);
+    snprintf(status,sizeof status,"%ums / %s",ms,space_sync?space_wanted()>3969?"LIMIT":"SYNC":"FREE");
+    ui_row(4,68,20,"PRESETS BPM",status,K_DIM,K_TEAL,K_BG);
+    if(space_page) snprintf(a,sizeof a,"%u%%",(unsigned)space_room*100u/127u);
+    else if(space_sync) w_cpy(a,SPACE_NOTE[space_division()],sizeof a);
+    else snprintf(a,sizeof a,"%ums",ms);
+    snprintf(b,sizeof b,"%u%%",space_page?(unsigned)space_damping*100u/127u:(unsigned)space_feedback*95u/127u);
+    snprintf(c,sizeof c,"%u%%",(unsigned)(space_page?space_width:space_tone)*100u/127u);
+    snprintf(d,sizeof d,"%u%%",(unsigned)(space_page?space_room_mix:space_mix)*100u/127u);
+    ui_landscape(1);ui_knobs(space_page?room:delay,a,b,c,d);
+    ui_row(13,214,26,space_page?"SAVE live FX":"EDIT sync  SAVE live",space_page?"SEL delay":"SEL reverb",K_DIM,K_DIM,K_PANEL);
 }
 
 static void ui_draw(void)
@@ -932,9 +937,11 @@ static void input(void)
         if(down&(1u<<B_ENV)) effects_open();
     } else if(ui_page==PG_SPACE) {
         if(algo) space_on=algo>0;
-        sam_knob(&space_time,plat_enc(EN_K1));sam_knob(&space_feedback,plat_enc(EN_K2));
-        sam_knob(&space_room,plat_enc(EN_K3));sam_knob(&space_mix,plat_enc(EN_K4)+turn);
+        sam_knob(space_page?&space_room:&space_time,plat_enc(EN_K1));sam_knob(space_page?&space_damping:&space_feedback,plat_enc(EN_K2));
+        sam_knob(space_page?&space_width:&space_tone,plat_enc(EN_K3));sam_knob(space_page?&space_room_mix:&space_mix,plat_enc(EN_K4)+turn);
         if(down&(1u<<B_EDIT)) space_sync=!space_sync;
+        if(down&(1u<<B_SEL)) {space_page=!space_page;ui_dirty=1;}
+        if(down&(1u<<B_SAVE)) space_live=!space_live;
         if(down&(1u<<B_PLAY)) radio_toggle();
         if(down&(1u<<B_REC)) ap_fav_save();
         if((down&(1u<<B_SEQ)) && ap_fav_open()) ui_page_set(PG_FAV);
@@ -983,6 +990,14 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"space_on")) *got=space_on;
     else if (!strcmp(what,"space_sync")) *got=space_sync;
     else if (!strcmp(what,"space_mix")) *got=space_mix;
+    else if (!strcmp(what,"space_page")) *got=space_page;
+    else if (!strcmp(what,"space_live")) *got=space_live;
+    else if (!strcmp(what,"space_div")) *got=(int)space_division();
+    else if (!strcmp(what,"space_feedback")) *got=space_feedback;
+    else if (!strcmp(what,"space_room_mix")) *got=space_room_mix;
+    else if (!strcmp(what,"space_tone")) *got=space_tone;
+    else if (!strcmp(what,"space_damping")) *got=space_damping;
+    else if (!strcmp(what,"space_width")) *got=space_width;
     else if (!strcmp(what,"screen_bytes")) *got=sizeof(field_screen_t);
     else if (!strcmp(what,"screen_drops")) *got=screen?(int)screen->drops:0;
     else if (!strcmp(what, "page"))

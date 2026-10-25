@@ -1,0 +1,67 @@
+wait 6000
+tap ARP
+tap REC
+wait 3000
+tap SEL
+tap SEL
+key 7 down
+key 7 up
+expect sam_voice 1
+press FX
+wait 500
+release FX
+expect page 11
+expect space_page 0
+expect sam_voice 1
+expect space_div 5
+turn K1 15
+expect space_div 8
+spin K2 100
+expect space_feedback 127
+turn K3 10
+expect space_tone 84
+turn K4 10
+expect space_mix 65
+tap SAVE
+expect space_live 0
+expect sam_state 2
+expect sam_voice 1
+shot field-delay.png
+tap SEL
+expect space_page 1
+expect sam_voice 1
+expect space_room_mix 45
+turn K2 10
+expect space_damping 100
+turn K3 -20
+expect space_width 60
+spin K4 -100
+expect space_room_mix 0
+expect space_mix 65
+turn K4 30
+expect space_room_mix 60
+shot field-reverb.png
+tap SAVE
+expect space_live 1
+tap SEL
+expect space_page 0
+expect space_div 8
+expect space_feedback 127
+expect space_mix 65
+tap EDIT
+expect space_sync 0
+shot field-delay-free.png
+tap EDIT
+turn K1 10
+expect space_div 9
+shot field-delay-limit.png
+turn PRESET 10
+expect tempo_bpm 130
+tap ARP
+expect page 6
+expect sam_state 2
+expect sam_len 21824
+expect sam_voice 1
+expect space_active 1
+tap HOME
+expect space_active 1

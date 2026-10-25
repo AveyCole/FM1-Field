@@ -588,7 +588,7 @@ const log = (t) => {
   if (atEnd) el.scrollTop = el.scrollHeight;
 };
 let image = null, boot = null;
-const meta = {"version": "0.1.13-alpha", "product": "FM-1_84000113", "pkg": new URL("firmware/field-0.1.13-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
+const meta = {"version": "0.1.14-alpha", "product": "FM-1_84000114", "pkg": new URL("firmware/field-0.1.14-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
 
 /* the backup: a requirement before every install; the link where the site has the backup page */
 document.querySelectorAll(".baklink").forEach((a) => { a.hidden = !meta.backup; });
