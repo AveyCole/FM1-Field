@@ -75,15 +75,33 @@ static void ldr_record_clear(void)
 #include "ldr_screen.c"
 static void ldr_progress(uint32_t done, uint32_t total) { ldr_screen_progress(done, total); ldr_poll(); }
 #include "ldr_core.c"
+#include "ldr_link.h"
+
+static void ldr_reconnect(void)
+{
+    /* Real D+ removal lets the host discard the old MIDI endpoint. Only used
+     * while waiting for an installer, outside ldr_session / flash writes. */
+    usb_detach();
+    fm1_wdt_feed();fm1_delay_ms(350);
+    memset(&usb,0,sizeof usb);
+    sx_ready=sx_collect=sx_busy=0;sx_pos=sx_frame_len=0;
+    so_r=so_w=0;mi_r=mi_w=mo_r=mo_w=0;midi_in_overflow=0;
+    usb_start();
+}
 
 extern uint32_t _bss_start[], _bss_end[];
 
 void ldr_main(void)
 {
+    ldr_link_t link;
     fm1_wdt_arm(0x0D);                              /* ~8 s, fed by ldr_poll */
     fm1_time_init();
+    /* The SPL may have attached USB using other descriptors. Hold it off
+     * through the startup screen so the loader enumerates as a new device. */
+    fm1_usb_off();fm1_delay_ms(350);
     ldr_screen_init();                              /* "UPDATING", "DO NOT UNPLUG", the bar (~0.4 s) */
     usb_start();
+    link.last=ldr_ms();link.rx=usb.rx_pkts;
     for (;;) {
         ldr_poll();
         usb_retry(ldr_ms());
@@ -101,6 +119,11 @@ void ldr_main(void)
                 fm1_delay_ms(30);
                 fm1_core_reset();                   /* the SPL boots the new app */
             }
+            /* Failed sessions return here only after flash/transport work
+             * has stopped. Start a fresh idle grace period before retrying. */
+            (void)ldr_link_due(&link,ldr_ms(),usb.rx_pkts,1);
+        } else if(ldr_link_due(&link,ldr_ms(),usb.rx_pkts,0)) {
+            ldr_reconnect();link.last=ldr_ms();link.rx=usb.rx_pkts;
         }
     }
 }

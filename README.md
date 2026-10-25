@@ -5,16 +5,22 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.6-alpha](docs/firmware/field-0.1.6-alpha.fwsc)**
+[Download 0.1.7-alpha](docs/firmware/field-0.1.7-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.6 update adds original startup artwork, a visible Near toggle on EDIT, and a sampler on ARP with a separate shared-memory effects mode on ENV. It retains the network throughput and playback reserve improvements, battery indicator and updated USB flasher. Software checks pass; this build still needs physical-device testing.
+The 0.1.7 update improves USB discovery and loader reconnect recovery, adds latched loops and keyboard slices, and makes OCT skip on pages without local octave controls. It retains the network throughput and playback reserve improvements, battery indicator and updated USB flasher. Software checks pass; this build still needs physical-device testing.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
+
+For installation, leave FIELD running normally; the web installer switches modes
+automatically. It also accepts a loader already on screen. Allow up to 45 seconds
+for discovery. The new loader re-enumerates USB after 12 idle seconds if necessary,
+with no reconnects during an active flash session. An older loader already running
+uses its old behavior until this release is staged from running firmware.
 
 The header shows a three-bar battery level, or `USB` when powered by an active USB host.
 
@@ -22,7 +28,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 
 | Control | Action |
 | --- | --- |
-| OCT− / OCT+ | Another random recording, within the current region |
+| OCT− / OCT+ | Another recording from any page; ARP retains octave transposition and WiFi typing retains character layers |
 | REC | Save a favorite on the player / ENV; capture in ARP; remove in the favorites list |
 | SEQ | Open favorites; press again to return |
 | SAVE | Browse country → state/province → Play random here |
@@ -32,7 +38,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | GLO | WiFi setup (2.4 GHz) |
 | MASTER | Volume |
 | Keys | Play the captured sample on the player and in ARP; hold white keys for FX in ENV |
-| ARP | Sample editor: REC capture, PLAY audition, SEL loop; K1 start, K2 end, K3 pitch, K4 level |
+| ARP | Sample editor: REC capture, PLAY audition, SEL cycles one shot / loop hold / loop latch / slice; K1 start, K2 end, K3 pitch, K4 level |
 | ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
 | EDIT | Toggle Near on the player; fixed 50 km neighborhood with a visible Near indicator |
 
@@ -44,8 +50,10 @@ These are online bookmarks: playback still requires WiFi and the recording to re
 The sampler holds one **2.728-second, 8 kHz mono ADPCM clip** (one playback voice).
 It survives returning to the main screen, changing recordings, and reopening ARP.
 REC again stops capture early; otherwise it stops at capacity. ARP's OCT buttons
-transpose; keys use C4 as the original pitch. In loop mode, releasing the triggering
-key stops playback. PLAY auditions/stops the clip. Leaving ARP finishes capture.
+transpose; keys use C4 as the original pitch. In Loop hold, releasing the triggering key stops playback. Loop latch keeps
+playing after release and across screens; tap its key again or PLAY in ARP to stop.
+Slice divides the trimmed range into 27 equal sections, one per key, at a common pitch.
+SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving ARP finishes capture.
 Clips are temporary: power-off, a new capture, or entering ENV clears them.
 ENV reuses the same 12 KiB for effects history; sample playback and FX are exclusive.
 
@@ -77,10 +85,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.6-alpha
+  python3 base/tools/build.py app --release 0.1.7-alpha
 ```
 
-This produces `app/build/field-0.1.6-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.7-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

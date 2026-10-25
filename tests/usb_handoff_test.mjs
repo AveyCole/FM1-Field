@@ -8,7 +8,7 @@ const core = page.slice(page.indexOf('const HS_QUERY'),page.indexOf('const $ =')
 const base = fs.readFileSync(new URL('../base/web/fm1ota.js',import.meta.url),'utf8').replaceAll('export ','');
 assert.equal(core.slice(core.indexOf('class Updater')).replaceAll('\r','').trim(),base.slice(base.indexOf('class Updater')).replaceAll('\r','').trim(),'published and reusable updater match');
 const ctx = vm.createContext({setTimeout,clearTimeout,TextEncoder,console});
-vm.runInContext(core+'\nthis.api={Updater,pack7,unpack7,IS_OTA,parseRequest};',ctx);
+vm.runInContext(core+'\nthis.api={Updater,Link,pack7,unpack7,IS_OTA,parseRequest};',ctx);
 const {Updater,pack7,unpack7,IS_OTA}=ctx.api;
 const PRODUCT='FM-1_84000103';
 class Device {
@@ -109,3 +109,24 @@ prefixed.inputs.get('in-1').name='MIDIIN2 (FIELD)';prefixed.outputs.get('out-1')
 const prefixUpdater=new Updater(prefixed),found=await prefixUpdater.find();
 assert.equal(found?.id.text,PRODUCT);await prefixUpdater.release();
 console.log('PASS: Windows-prefixed FIELD input/output names recognized');
+// A native open can hang forever while a stale Windows endpoint remains
+// "connected". It must not hide the live FIELD endpoint behind it.
+const stuck=new Device();let finishIn,finishOut,lateCloses=0;
+const stalePort=(name,setFinish)=>({name,state:'connected',connection:'closed',
+  open(){return new Promise(resolve=>setFinish(()=>{this.connection='open';resolve();}));},
+  async close(){this.connection='closed';lateCloses++;},send(){}});
+const staleIn=stalePort('FIELD stale input',fn=>finishIn=fn);
+const staleOut=stalePort('FIELD stale output',fn=>finishOut=fn);
+stuck.inputs.set('hung',staleIn);stuck.outputs.set('hung',staleOut);
+const boundedUpdater=new Updater(stuck);boundedUpdater.portTimeout=25;
+const started=Date.now(),live=await boundedUpdater.find(undefined,Date.now()+1000);
+assert.equal(live?.id.text,PRODUCT);assert(Date.now()-started<500);
+finishIn();finishOut();await new Promise(r=>setTimeout(r,20));
+assert.equal(staleIn.connection,'closed');assert.equal(staleOut.connection,'closed');
+assert(lateCloses>=4,'late native opens are closed after the timeout, too');
+await boundedUpdater.release();assert.equal(boundedUpdater.opening.size,0);
+console.log('PASS: hung native opens cannot block running FIELD; late handles are released');
+const hungClose={onmidimessage:null,close:()=>new Promise(()=>{})};
+const closing=Date.now();await new ctx.api.Link(hungClose,hungClose).close();
+assert(Date.now()-closing<1500);
+console.log('PASS: hung native close is bounded');

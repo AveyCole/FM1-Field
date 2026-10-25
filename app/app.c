@@ -476,7 +476,7 @@ static int sam_knob(uint8_t *v,int32_t d)
 static void ui_sampler(void)
 {
     char a[20],b[20],c[20],d[20],status[40];
-    ui_title(0,"Sampler",sam_loop?"Loop":"One shot");
+    ui_title(0,"Sampler",sam_loop==3?"Slice":sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
     if(sam_state==SAM_CAPTURE) snprintf(status,sizeof status,"Capturing %u%%",(unsigned)(sam_len*100u/SAM_FRAMES));
     else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/SAM_RATE));
     else w_cpy(status,ui_msg[0]?ui_msg:"REC captures / 2.7s mono",sizeof status);
@@ -488,7 +488,7 @@ static void ui_sampler(void)
     ui_cell(2,8,76,"K1","START",a,0);ui_cell(3,120,76,"K2","END",b,0);
     ui_cell(4,8,122,"K3","PITCH",c,0);ui_cell(5,120,122,"K4","LEVEL",d,0);
     ui_piano(6,174,-1,sam_keys);
-    ui_row(13,214,26,"REC capture  SEL loop","ARP back",K_DIM,K_DIM,K_PANEL);
+    ui_row(13,214,26,"REC capture  SEL mode","ARP back",K_DIM,K_DIM,K_PANEL);
 }
 
 static void ui_draw(void)
@@ -682,6 +682,10 @@ static void input(void)
     uint32_t now = plat_buttons(), down = now & ~btn_prev;
     int32_t turn = plat_enc(EN_SELECT);
     btn_prev = now;
+    /* Local octave/layer controls take precedence; elsewhere these always
+     * request another sound without changing the screen being used. */
+    if(ui_page!=PG_SYNTH && ui_page!=PG_PASS &&
+       (down&((1u<<B_OCTDN)|(1u<<B_OCTUP)))) ap_shuffle();
     {   /* GLO: WiFi, from anywhere; HOME held: the controls */
         static uint32_t home_t;
         if (down & (1u << B_GLO))
@@ -699,10 +703,13 @@ static void input(void)
     {   /* One shared keyboard on the player and sample editor. */
         uint32_t keys=(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH)?plat_keys():0u;
         uint32_t on=keys&~sam_keys,off=sam_keys&~keys;int k;
-        if(sam_key>=0 && (off>>(unsigned)sam_key&1u) && sam_loop) sam_gate=0;
-        if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH) sam_gate=0;
+        if(sam_key>=0 && (off>>(unsigned)sam_key&1u) && sam_loop==1) sam_gate=0;
+        if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH && sam_loop!=2) sam_gate=0;
         sam_keys=keys;
-        for(k=0;k<NKEYS;k++) if(on>>k&1u) {sam_note(53+k);sam_key=(int8_t)k;}
+        for(k=0;k<NKEYS;k++) if(on>>k&1u) {
+            if(sam_loop==2 && sam_voice && sam_key==k) sam_gate=0;
+            else {sam_note(53+k);sam_key=(int8_t)k;}
+        }
     }
     {
         uint32_t keys=ui_page==PG_EFFECTS?plat_keys():0u,h=0;int w;
@@ -719,7 +726,6 @@ static void input(void)
             ui_page_set(PG_SYNTH);
             return;
         }
-        if (down & ((1u << B_OCTDN) | (1u << B_OCTUP))) ap_shuffle();
         if (down & (1u << B_SEL)) ap_info = !ap_info;
         if (down & (1u << B_EDIT)) ap_near_toggle();
         if (down & (1u << B_SAVE)) {ap_regions_open();ui_page_set(PG_BROWSE);}
@@ -804,14 +810,17 @@ static void input(void)
         sam_knob(&sam_level,plat_enc(EN_K4)+turn);
         if((down&(1u<<B_OCTDN)) && sam_oct>-2) sam_oct--;
         if((down&(1u<<B_OCTUP)) && sam_oct<2) sam_oct++;
-        if(down&(1u<<B_SEL)) sam_loop=!sam_loop;
+        if(down&(1u<<B_SEL)) {
+            sam_loop=(sam_loop+1u)%4u;
+            if(sam_loop==0 || sam_loop==3) sam_voice=sam_gate=0;
+        }
         if(down&(1u<<B_REC)) {
             if(sam_state==SAM_CAPTURE || radio_st==RS_PLAYING) {ui_msg[0]=0;sam_record();}
             else w_cpy(ui_msg,"Wait for PLAYING",sizeof ui_msg);
         }
         if(down&(1u<<B_PLAY)) {
             if(sam_voice) sam_gate=0;
-            else {sam_note(60);sam_key=-1;}
+            else {sam_note(sam_loop==3?53+sam_slice:60);sam_key=-1;}
         }
         if(down&((1u<<B_HOME)|(1u<<B_ARP))) ui_page_set(ap_player_page());
     } else if(ui_page==PG_EFFECTS) {
@@ -879,6 +888,8 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"sam_voice")) *got=sam_voice;
     else if (!strcmp(what,"sam_loop")) *got=sam_loop;
     else if (!strcmp(what,"sam_pitch")) *got=sam_pitch;
+    else if (!strcmp(what,"sam_oct")) *got=sam_oct;
+    else if (!strcmp(what,"sam_slice")) *got=sam_slice;
     else if (!strcmp(what,"fx_mode")) *got=fx_mode;
     else if (!strcmp(what, "syn_wave"))
         *got = syn.wave;
@@ -933,6 +944,7 @@ static void lights(void)
         lb=1u<<B_ENV|1u<<B_HOME|1u<<B_ARP|1u<<B_PLAY|1u<<B_FX|1u<<B_GLO|1u<<B_REC|1u<<B_SEQ;
         lk=((1u<<NKEYS)-1u)&~plat_keys();
     }
+    lb|=1u<<B_OCTDN|1u<<B_OCTUP;
     plat_leds(lb, lk);
 }
 

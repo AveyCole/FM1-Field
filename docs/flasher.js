@@ -59,6 +59,14 @@ const HS_QUERY = [0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7];
 const UPGRADE = [0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7];
 const MAXDATA = 512;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function bounded(promise, ms, message) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
+    })]);
+  } finally { clearTimeout(timer); }
+}
 const IS_OTA = (id) => /^ota-/i.test(id.model);
 
 // M-VAVE's FM1 Open firmware (V10, 2026-10): its updater takes only a package it has been told about
@@ -155,7 +163,7 @@ class Link {
     // Release the native MIDI handles as well as the JS callback. Windows can
     // retain the old handles while the FM-1 re-enumerates as its update loader.
     await Promise.allSettled([this.input, this.output].map(async (port) => {
-      if (port.close) await port.close();
+      if (port.close) await bounded(Promise.resolve().then(() => port.close()), 1000, "MIDI close timed out");
     }));
   }
 }
@@ -205,23 +213,44 @@ class Updater {
     this.refreshAccess = refreshAccess;
     this.log = log || (() => {});
     this.links = new Set();
+    this.opening = new Set();
+    this.portTimeout = 4000;
+  }
+
+  async open(link) {
+    let abandoned = false;
+    const tasks = [link.input, link.output].map((port) => {
+      this.opening.add(port);
+      return Promise.resolve().then(() => port.open()).then(async () => {
+        // A native open can resolve after its deadline or a disconnect. Close
+        // that late handle too, without letting it own the next discovery pass.
+        if (abandoned && port.close) await bounded(Promise.resolve().then(() => port.close()), 1000, "Late MIDI close timed out");
+      }).finally(() => this.opening.delete(port));
+    });
+    try { await bounded(Promise.all(tasks), this.portTimeout, "MIDI port open timed out; trying fresh endpoints"); }
+    catch (e) { abandoned = true; throw e; }
   }
 
   // Only probe known FM-1 product/loader names, then verify its identity.
-  async find(filter) {
+  async find(filter, deadline = Date.now() + 15000) {
     const known = (port) => /fm-?1|felucca|ota|composite|sinco|usb[- _]?midi|\bfield\b|\baporee\b/i.test((port.name || "") + " " + (port.manufacturer || ""));
-    const outs = [...this.access.outputs.values()].filter((p) => p.state !== "disconnected" && known(p));
-    for (const input of [...this.access.inputs.values()]) {
-      if (input.state === "disconnected" || !known(input)) continue;
+    // Prefer recently enumerated endpoints over retained ghosts. Pending opens
+    // are skipped until they settle; one native handle cannot stall discovery.
+    const outs = [...this.access.outputs.values()].reverse().filter((p) => p.state !== "disconnected" && known(p));
+    for (const input of [...this.access.inputs.values()].reverse()) {
+      if (input.state === "disconnected" || !known(input) || this.opening.has(input)) continue;
       const same = outs.filter((p) => p.name === input.name);
       const candidates = [...same, ...outs.filter((p) => !same.includes(p))];
       for (const output of candidates) {
+        if (Date.now() >= deadline) return null;
+        if (this.opening.has(input)) break;
+        if (this.opening.has(output)) continue;
         // Each failed probe must release both ports, including partial opens.
         const link = new Link(input, output);
         let keep = false;
         try {
           this.log(`MIDI probe: ${input.name} → ${output.name}`);
-          await input.open(); await output.open();
+          await this.open(link);
           if (link.lost) continue;
           const id = await handshake(link, 2);
           if (id && (!filter || filter(id))) {
@@ -266,11 +295,12 @@ class Updater {
   async waitFor(filter, ms) {
     const end = Date.now() + ms;
     while (Date.now() < end) {
-      const dev = await this.find(filter);
+      const dev = await this.find(filter, end);
       if (dev) return dev;
       await this.portsChanged(Math.max(0, Math.min(500, end - Date.now())));
+      if (Date.now() >= end) break;
       if (this.refreshAccess) {
-        try { this.access = await this.refreshAccess(); }
+        try { this.access = await bounded(Promise.resolve().then(() => this.refreshAccess()), Math.min(1500,end-Date.now()), "MIDI refresh timed out"); }
         catch (e) { this.log(`MIDI access refresh: ${e.message}`); }
       }
     }
@@ -312,7 +342,8 @@ class Updater {
     const step = onStep || (() => {});
     // One discovery path accepts either application or loader, including a
     // loader that appears while the browser is still refreshing its port map.
-    const dev = await this.waitFor(() => true, 15000);
+    this.logPorts();
+    const dev = await this.waitFor(() => true, 45000);
     if (!dev) {
       this.logPorts();
       throw fail("notfound", "Neither running firmware nor update loader answered. See the MIDI port list below.");
@@ -334,7 +365,7 @@ class Updater {
       if (!s1.finished) throw fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
       step("loader");
       await sleep(3000);
-      ota = await this.waitFor(IS_OTA, 30000);
+      ota = await this.waitFor(IS_OTA, 45000);
       if (!ota) {
         this.log("No update loader answered after switching modes.");
         this.logPorts();
@@ -557,7 +588,7 @@ const log = (t) => {
   if (atEnd) el.scrollTop = el.scrollHeight;
 };
 let image = null, boot = null;
-const meta = {"version": "0.1.6-alpha", "product": "FM-1_84000106", "pkg": new URL("firmware/field-0.1.6-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
+const meta = {"version": "0.1.7-alpha", "product": "FM-1_84000107", "pkg": new URL("firmware/field-0.1.7-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
 
 /* the backup: a requirement before every install; the link where the site has the backup page */
 document.querySelectorAll(".baklink").forEach((a) => { a.hidden = !meta.backup; });
@@ -649,7 +680,7 @@ async function run(img, product, isStock, sha256) {
       if (k === "bootstart" || k === "bootwrite") sayK(k);
       if (k === "bootdone") { $("bar").value = 100; sayK("bootdone"); }
     };
-    say("Looking for FM-1 or update loader…");
+    say("Looking for running FIELD or its update loader (up to 45 seconds)…");
     await up.install(img, product, step, sha256);
     if (withBoot) await up.installBoot(boot, product, step);
   } catch (e) {

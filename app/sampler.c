@@ -9,7 +9,7 @@ enum {SAM_EMPTY,SAM_CAPTURE,SAM_READY};
 static uint8_t *sam_data;
 static volatile uint8_t sam_active,sam_state,sam_voice,sam_gate;
 static volatile uint32_t sam_len;
-static uint8_t sam_start,sam_end=127,sam_level=110,sam_loop,sam_div;
+static uint8_t sam_start,sam_end=127,sam_level=110,sam_loop,sam_div,sam_slice;
 static int8_t sam_pitch,sam_oct;
 static int sam_pred,sam_index;
 static uint32_t sam_tick,sam_cached=0xFFFFFFFFu;
@@ -69,7 +69,8 @@ static void sam_finish(void)
 }
 static void sam_exit(void)
 {
- sam_voice=sam_gate=0;sam_active=0;
+ if(sam_loop!=2) sam_voice=sam_gate=0;
+ sam_active=0;
  sam_finish();
 }
 static void sam_record(void)
@@ -97,18 +98,29 @@ static void sam_capture(float l,float r,int fresh)
  sam_len=pos+1u;
  if(sam_len==SAM_FRAMES) sam_state=SAM_READY;
 }
-static unsigned sam_first(void) {return (unsigned)(sam_len*sam_start/127u);}
-static unsigned sam_last(void)
+static unsigned sam_trim_first(void) {return (unsigned)(sam_len*sam_start/127u);}
+static unsigned sam_trim_last(void)
 {
- unsigned first=sam_first(),last=(unsigned)(sam_len*sam_end/127u);
+ unsigned first=sam_trim_first(),last=(unsigned)(sam_len*sam_end/127u);
  if(last<first+32u) last=first+32u;
  return last>sam_len?(unsigned)sam_len:last;
 }
+static unsigned sam_first(void)
+{
+ unsigned first=sam_trim_first();
+ return sam_loop==3?first+(sam_trim_last()-first)*sam_slice/27u:first;
+}
+static unsigned sam_last(void)
+{
+ unsigned first=sam_trim_first(),last=sam_trim_last();
+ return sam_loop==3?first+(last-first)*(sam_slice+1u)/27u:last;
+}
 static void sam_note(int note)
 {
- if(sam_state!=SAM_READY || sam_len<64 || sam_first()+32u>sam_len) return;
+ if(sam_loop==3) sam_slice=(uint8_t)(note<53?0:note>79?26:note-53);
+ if(sam_state!=SAM_READY || sam_len<64 || sam_first()+2u>sam_last()) return;
  sam_voice=0;sam_pos=(float)sam_first();sam_env=0;
- sam_step=((float)SAM_RATE/44100.0f)*fm_exp2f((float)(note-60+sam_pitch+12*sam_oct)/12.0f);
+ sam_step=((float)SAM_RATE/44100.0f)*fm_exp2f((float)((sam_loop==3?0:note-60)+sam_pitch+12*sam_oct)/12.0f);
  sam_gate=1;sam_voice=1;
 }
 static float sam_next(void)
@@ -116,10 +128,10 @@ static float sam_next(void)
  unsigned first,last,i,j;float t,v,edge;
  if(!sam_voice || sam_state!=SAM_READY) return 0;
  first=sam_first();last=sam_last();
- if(first+32u>last) {sam_voice=0;return 0;}
+ if(first+2u>last) {sam_voice=0;return 0;}
  if(sam_pos<(float)first) sam_pos=(float)first;
  if(sam_pos>=(float)last) {
-  if(sam_loop && sam_gate) sam_pos=(float)first;
+  if((sam_loop==1 || sam_loop==2) && sam_gate) sam_pos=(float)first;
   else {sam_voice=0;return 0;}
  }
  i=(unsigned)sam_pos;j=i+1u<last?i+1u:i;t=sam_pos-(float)i;

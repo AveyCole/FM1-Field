@@ -30,6 +30,19 @@ int main(void)
     sam_exit();assert(sam_state==SAM_READY && sam_len==SAM_FRAMES);
     sam_note(72);for(i=0;i<1000;i++) sam_next();assert(sam_voice); /* main-page playback */
     sam_gate=0;for(i=0;i<300;i++) sam_next();assert(!sam_voice);
+    sam_loop=3;sam_pitch=sam_oct=0;
+    unsigned end=0;
+    for(i=0;i<27;i++) {
+        sam_note(53+(int)i);
+        assert(sam_first()==end);end=sam_last();
+        assert(sam_last()>sam_first());
+        for(unsigned j=0;j<6000;j++) assert(isfinite(sam_next()));
+        assert(!sam_voice); /* slices never loop and stay within their range */
+    }
+    assert(end==SAM_FRAMES);
+    sam_start=32;sam_end=110;end=sam_trim_first();
+    for(i=0;i<27;i++) {sam_note(53+(int)i);assert(sam_first()==end);end=sam_last();}
+    assert(end==sam_trim_last());sam_start=0;sam_end=127;sam_loop=0;
     sam_enter();sam_record();for(i=0;i<4410;i++) sam_capture(0.1f,0.1f,1);
     sam_record();assert(sam_state==SAM_READY && sam_len==800);
     sam_start=125;sam_end=126;sam_note(60);

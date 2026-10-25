@@ -23,6 +23,48 @@ shot field-sampler.png
 key 7 up
 wait 40
 expect sam_voice 0
+tap SEL
+expect sam_loop 2
+key 7 down
+wait 100
+key 7 up
+wait 3000
+expect sam_voice 1
+shot field-sampler-latch.png
+tap ARP
+expect page 0
+expect sam_voice 1
+key 7 down
+wait 40
+expect sam_voice 0
+key 7 up
+tap ARP
+expect page 6
+tap PLAY
+expect sam_voice 1
+tap PLAY
+wait 40
+expect sam_voice 0
+tap SEL
+expect sam_loop 3
+key 0 down
+wait 40
+expect sam_voice 1
+expect sam_slice 0
+key 0 up
+wait 150
+expect sam_voice 0
+key 26 down
+wait 40
+expect sam_slice 26
+key 26 up
+wait 150
+expect sam_voice 0
+shot field-sampler-slices.png
+tap SEL
+expect sam_loop 0
+tap SEL
+expect sam_loop 1
 tap ARP
 expect page 0
 expect sam_active 0

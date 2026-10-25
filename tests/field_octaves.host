@@ -1,0 +1,49 @@
+# OCT skips without leaving a page, except existing sampler/typing controls.
+wait 3500
+expect ap_sound 1
+tap GLO
+tap OCT+
+wait 400
+expect page 2
+expect ap_sound 2
+tap SEL
+wait 1500
+tap OCT-
+wait 400
+expect page 3
+expect ap_sound 3
+turn SELECT 30
+tap PLAY
+expect page 4
+tap OCT+
+wait 400
+expect page 4
+expect ap_sound 3
+tap HOME
+tap HOME
+tap HOME
+expect page 0
+tap ARP
+tap OCT+
+expect sam_oct 1
+expect page 6
+expect ap_sound 3
+tap HOME
+tap SEQ
+tap OCT+
+wait 400
+expect page 7
+expect ap_sound 4
+tap HOME
+tap SAVE
+tap OCT-
+wait 400
+expect page 1
+expect ap_sound 5
+tap HOME
+tap ENV
+tap OCT+
+wait 400
+expect page 9
+expect fx_mode 1
+expect ap_sound 6

@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.6-alpha
+# FIELD — experimental 0.1.7-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.6-alpha
+  python3 base/tools/build.py app --release 0.1.7-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -313,3 +313,48 @@ image 579744 B; RAM .data+.bss 130592 B of 131072; pool 308880 B of 311296. Real
 Run `PYTHON=python3 APOREE_TEST_STREAM=/path/to/long.mp3 sh tests/run_field_modes.sh`.
 The real API fixture test is `cc -O1 -Ibase/include tests/aporee_net_test.c -o
 /tmp/aporee_test && /tmp/aporee_test tmp-locations.json tmp-playlist.json`.
+
+## USB recovery, loop latch, slices and contextual OCT (0.1.7)
+
+The browser still accepts both running FIELD and a loader, and the normal path
+requests update mode automatically. Initial discovery and the loader handoff now
+wait up to 45 seconds. Native MIDI opens are bounded at four seconds, closes at
+one second, and access refresh at 1.5 seconds. Timed-out opens are skipped while
+pending and late handles are closed. Recently enumerated endpoints are preferred
+over retained ghosts. Probe passes honor their outer deadline. This prevents a
+hung native MIDI operation from blocking all subsequent discovery indefinitely.
+
+The new loader explicitly disconnects USB for 350 ms before its startup screen,
+and the application-to-loader handoff holds D+ off for 350 ms. While idle, a lack
+of MIDI RX traffic for 12 seconds triggers a 350 ms soft detach, transport queue
+reset, and reattachment. This recovers a live controller with stalled host
+enumeration; the inherited usb_retry only retries when the controller itself is
+down. The idle policy runs outside ldr_session, never during firmware transfer
+or flash writes. Failed sessions receive a fresh idle grace period. This loader
+is staged from the new package when an install starts from running firmware; a
+loader already started from an older package does not gain this code magically.
+Physical Windows/Chrome behavior remains to be confirmed; the changes are not
+a guarantee against an OS driver fault or another app holding the MIDI device.
+
+ARP SEL cycles One shot, Loop hold, Loop latch, Slice, then One shot. Held loops
+stop on key release; latched loops keep playing across screens and stop with
+their key again or PLAY in ARP. Slice maps the trimmed sample across all 27 keys
+as equal, contiguous, non-looping ranges at the same base pitch; manual tuning
+and octave transposition still apply. PLAY auditions the selected slice. No
+additional audio bank is allocated. ENV still clears the clip for its shared FX
+history. REC remains capture in ARP and favorites on the player / ENV.
+
+OCT skips in place on the player, regions, favorites, WiFi/network list, effects
+and help pages, retaining the current Near/region scope. Existing local functions
+take precedence: ARP transposes sample octaves, and WiFi name/password entry
+uses OCT as its character-layer modifiers. The current page stays open.
+
+Tests cover running FIELD and already-running loader installs, late enumeration,
+Windows names, never-resolving native opens/closes and cleanup of late handles.
+Loader idle policy tests cover host traffic, active-session suppression and timer
+wrap. The real loader transfer test verifies app writes, preserved flash head,
+update-record cleanup, no-op reinstall and damaged-image refusal. Sampler tests
+cover latched playback across navigation, stop/retrigger controls, all 27 slices,
+trimmed coverage, bounds and existing capture behavior. Contextual OCT, favorites,
+streaming crypto and scheduler regressions pass. Build checks pass: image 580032 B; RAM .data+.bss 130592 B of 131072; pool 308880 B of 311296.
+Hardware USB recovery and playback still need a physical-device test.
