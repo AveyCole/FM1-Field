@@ -54,7 +54,8 @@
   dialog .row { display: flex; gap: 12px; justify-content: flex-end; margin: 24px 0 0; }
   button.plain { background: none; color: var(--fg); border: 1px solid var(--dim); }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-:root[data-theme],:root:not([data-theme]){--bg:#142a20;--fg:#f6efd8;--dim:#b5bfa1;--accent:#cd8b5b;--on-accent:#142a20;--bad:#e2ad87;--focus:#a0bb7d}</style>
+:root[data-theme],:root:not([data-theme]){--bg:#142a20;--fg:#f6efd8;--dim:#b5bfa1;--accent:#cd8b5b;--on-accent:#142a20;--bad:#e2ad87;--focus:#a0bb7d}.cheddar{margin:44px auto 0;max-width:280px;text-align:center}.cheddar img{display:block;width:100%;height:auto;border-radius:10px;border:1px solid var(--dim)}.cheddar figcaption{margin:8px 0 0;font-style:italic;font-size:15px;color:var(--dim)}.support-cta{margin:14px 0 0}.support-link{display:inline-flex;align-items:center;gap:10px;max-width:100%;min-height:48px;padding:12px 22px;border:2px solid #252525;border-radius:8px;background:#ffdd00;color:#252525;font-size:16px;font-weight:700;line-height:1.35;text-decoration:none}.support-link:hover{background:#ffe64b}.support-link:focus-visible{outline:3px solid var(--focus);outline-offset:4px}
+</style>
 </head>
 <body>
 <main>
@@ -96,6 +97,7 @@
   <label class="sr" for="report" data-t="reportlabel">Crash report</label>
   <textarea id="report" readonly hidden rows="14"></textarea>
   <p><a href="../" data-t="manual">Back to FIELD</a></p>
+<figure class="cheddar"><img src="../cheddar-yawn.jpg" width="600" height="1052" alt="Gray and white cat yawning among dry oak leaves" loading="lazy"><figcaption>Cheddar Butt</figcaption><p class="support-cta"><a class="support-link" href="https://buymeacoffee.com/aveycole" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">☕</span><span data-t="supportcta">Support A.V. on Buy Me a Coffee</span><span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p></figure>
 </main>
 <dialog id="confirm" aria-labelledby="confirmh">
   <form method="dialog">
@@ -114,6 +116,6 @@
     Fonts: Barlow Semi Condensed (SIL OFL 1.1). M-VAVE and FM-1 are trademarks of their respective owners.<br>
     <span data-t="license"></span> <a href="https://github.com/AveyCole/FM1-Field" target="_blank" rel="noopener">FIELD source on GitHub<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
 </footer>
-<script type="module" src="../flasher.js?v=0.1.16-lofi-1"></script>
+<script type="module" src="../flasher.js?v=0.1.16-support-1"></script>
 </body>
 </html>
