@@ -9,7 +9,7 @@
 static int16_t guarded[FX_HIST+32],*fx_hist=guarded+16;
 static volatile uint32_t fx_beat=22050;
 #include "../app/field_space.c"
-static void reset(void){memset(guarded,0x5A,sizeof guarded);memset(fx_hist,0,FX_HIST*2);space_reset();space_on=1;space_mix=127;}
+static void reset(void){space_data=fx_hist;memset(guarded,0x5A,sizeof guarded);memset(fx_hist,0,FX_HIST*2);space_reset();space_on=1;space_mix=127;}
 int main(void)
 {
  double early=0,late=0,stereo=0;int first=-1;

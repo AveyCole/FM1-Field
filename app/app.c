@@ -449,7 +449,6 @@ static uint32_t sam_keys;
 static int8_t sam_key=-1;
 static void sampler_open(void)
 {
-    space_active=0;
     if(sam_state==SAM_EMPTY) {fx_mode=0;fx_held=fx_wire=0;(void)sam_restore();}
     sam_enter();
 }
@@ -457,6 +456,7 @@ static void effects_open(void)
 {
     int had_sample=sam_state!=SAM_EMPTY;
     space_active=0;
+    free(space_data);space_data=0;
     sam_voice=sam_gate=0;sam_state=SAM_EMPTY;sam_len=0;
     sam_active=0;sam_keys=0;
     if(fx_hist) memset(fx_hist,0,FX_HIST*sizeof *fx_hist);
@@ -524,10 +524,15 @@ static void ui_filter(void)
 
 static void space_open(void)
 {
-    if(!fx_hist) {ap_fav_notice(7);return;}
+    if(!space_data) {
+        if(plat_screen_memory()<FX_HIST*2u+24576u || !(space_data=malloc(FX_HIST*2u))) {
+            w_cpy(ui_msg,"FX memory low",sizeof ui_msg);ui_dirty=1;return;
+        }
+        memset(space_data,0,FX_HIST*2u);
+    }
     if(!space_active) {
-        fx_mode=0;fx_held=fx_wire=0;sam_voice=sam_gate=sam_active=0;sam_state=SAM_EMPTY;sam_len=0;
-        memset(fx_hist,0,FX_HIST*sizeof *fx_hist);space_reset();space_on=space_active=1;
+        fx_mode=0;fx_held=fx_wire=0;
+        space_reset();space_on=space_active=1;
     }
     ui_page_set(PG_SPACE);
 }
@@ -575,7 +580,7 @@ static void ui_draw(void)
 static void ui_page_set(int pg)
 {
     if(ui_page==PG_EFFECTS && pg!=PG_EFFECTS) {fx_mode=0;fx_held=0;fx_wire=0;}
-    if(ui_page==PG_SYNTH && pg!=PG_SYNTH) {
+    if(sam_active && pg!=PG_SYNTH && pg!=PG_SPACE) {
         sam_exit();
 
     }
@@ -706,7 +711,7 @@ void app_init(void)
     sam_init(fx_hist);
     (void)sam_restore();
     fil_init();
-    space_active=0;space_reset();
+    space_active=0;free(space_data);space_data=0;space_reset();
     fx_mode=0;fx_held=0;
     rset_load();
 }
@@ -748,9 +753,9 @@ static void input(void)
     int32_t algo = plat_enc(EN_ALGO);
     int32_t presets = plat_enc(EN_PRESET);
     btn_prev = now;
-    if(ui_page!=PG_HOME && ui_page!=PG_REGION) fx_pending=0;
+    if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH) fx_pending=0;
     if(down&(1u<<B_FX)) {
-        if(ui_page==PG_HOME || ui_page==PG_REGION) {fx_pending=1;fx_press_ms=plat_ms();}
+        if(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH) {fx_pending=1;fx_press_ms=plat_ms();}
         else {tempo_tap(plat_ms());fil_restart=1;if(ui_page==PG_FILTER) fil_sync=1;}
     }
     if(fx_pending) {
@@ -781,10 +786,10 @@ static void input(void)
         }
     }
     {   /* One shared keyboard on the player and sample editor. */
-        uint32_t keys=(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH || ui_page==PG_FILTER)?plat_keys():0u;
+        uint32_t keys=(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH || ui_page==PG_FILTER || ui_page==PG_SPACE)?plat_keys():0u;
         uint32_t on=keys&~sam_keys,off=sam_keys&~keys;int k;
         if(sam_key>=0 && (off>>(unsigned)sam_key&1u) && sam_loop==1) sam_gate=0;
-        if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH && ui_page!=PG_FILTER && sam_loop!=2) sam_gate=0;
+        if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH && ui_page!=PG_FILTER && ui_page!=PG_SPACE && sam_loop!=2) sam_gate=0;
         sam_keys=keys;
         for(k=0;k<NKEYS;k++) if(on>>k&1u) {
             if(sam_loop==2 && sam_voice && sam_key==k) sam_gate=0;

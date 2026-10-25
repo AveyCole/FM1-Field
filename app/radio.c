@@ -530,7 +530,6 @@ static void radio_render(int32_t *o, uint32_t n)
         }
         sam_capture(l,rr,fresh);
         if(playing && fx_mode) fx_process(&l,&rr);
-        if(space_active) space_process(&l,&rr);
         sam_monitor(&l,&rr);                     /* monitoring only: capture still receives the live source */
 
         {   /* Keep the live recording audible on every sampler/player page. */
@@ -538,6 +537,7 @@ static void radio_render(int32_t *o, uint32_t n)
             l = fm_clampf(l + sy, -1.0f, 1.0f);
             rr = fm_clampf(rr + sy, -1.0f, 1.0f);
         }
+        if(space_active) space_process(&l,&rr);
         fil_process(&l,&rr);
         o[2u * i] = (int32_t)(l * gain);
         o[2u * i + 1u] = (int32_t)(rr * gain);

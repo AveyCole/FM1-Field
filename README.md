@@ -5,16 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.11-alpha](docs/firmware/field-0.1.11-alpha.fwsc)**
+[Download 0.1.12-alpha](docs/firmware/field-0.1.12-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.11 update adds Echo + Room behind a home-screen FX hold, keeps short taps for tempo, and adds BPM on PRESETS in both FX pages. It also stops audio and uses a full-chip reset for update handoff and loader completion to address firmware-switch restart failures. Software checks pass; physical-device testing is still needed. The first install from older FIELD may still need a power-cycle if its old handoff stalls.
-Back up your existing firmware's projects before installing. The installer includes
-stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
-the FM-1 connected directly by a USB data cable.
+The 0.1.12 update lets Echo + Room process sampler playback. Hold FX in ARP to open its controls without clearing the clip or interrupting a latched loop; ARP returns with the effect running. Software checks pass; physical-device testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -42,7 +39,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | PRESETS in ARP Slice | Select 4, 8, 16 or 27 equal slices of the trimmed clip; fewer slices are longer |
 | LFO | Open the filter page; press again or HOME to return to the player |
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
-| FX | Short tap sets tempo; hold 450 ms on HOME or the regional player to open Echo + Room |
+| FX | Short tap sets tempo; hold 450 ms on HOME, the regional player or ARP to open Echo + Room |
 | PRESETS on either FX page | Set the shared BPM, 40–240; header displays it |
 | ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
 | EDIT | Toggle Near on the player; fixed 50 km neighborhood with a visible Near indicator |
@@ -61,10 +58,10 @@ Slice divides the trimmed range into 4, 8, 16 or 27 equal sections at a common
 pitch. PRESETS selects the count while in Slice mode; higher keys repeat the
 sequence when fewer than 27 slices are selected. It starts at 27 on boot.
 Changing the count stops the current sample voice and retains the clip.
-SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving ARP finishes capture without saving it.
+SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving the sampler/FX workspace finishes capture without saving it.
 The live recording stays audible in ARP by default. Turn ALGORITHM left to mute
 its monitor and right to restore it. This switch does not mute the sample or
-stop capture. A short fade avoids an abrupt gain change. Leaving ARP restores
+stop capture. A short fade avoids an abrupt gain change. Leaving ARP for Echo + Room retains this monitor setting; leaving that workspace restores
 the live recording; the editor remembers its switch until reboot.
 
 Press **SAVE in ARP** to store one clip, including trim, pitch/octave, level,
@@ -72,7 +69,7 @@ playback mode and slice count. SAVE during capture finishes it early and saves.
 The display confirms “Sample saved.” Another SAVE replaces this single slot.
 New captures and edits are temporary until saved. The saved clip restores at
 boot and when ARP is reopened with no clip after ENV reuses its RAM for FX.
-Sample playback and live FX still share the same 12 KiB and are exclusive.
+Sampler playback and Echo + Room now work together in separate memory. The ENV held-key mode still reuses the sample bank and clears its unsaved clip.
 Saving briefly interrupts audio while the flash is programmed. Failed writes
 retain the previous saved version. Normal FIELD updates preserve the slot;
 restoring other firmware or erasing user data can overwrite it.
@@ -111,7 +108,7 @@ needs a small amount of state and shares no sample/FX audio memory.
 
 ![FIELD river filter](docs/images/field-filter.png)
 
-Hold FX on the home screen (including the regional player) for 450 ms to open
+Hold FX on the home screen, regional player or ARP sampler for 450 ms to open
 **Echo + Room**. A shorter press is still a tempo tap, timed from the press
 rather than release. A hold does not add a tempo tap. Other pages retain tap
 tempo. PRESETS adjusts the shared BPM on both Echo + Room and ENV's FX page;
@@ -125,14 +122,22 @@ player while the combo continues. FX still taps tempo on the combo page.
 Tails continue after stopping the source and decay naturally. The dry stereo
 audio stays full rate; the warm echo/room path runs at 11.025 kHz.
 
-The combo exclusively reuses the same 12 KiB as the sampler/held-key FX. Entering
-it clears an unsaved clip. SAVE in ARP first to keep a clip; opening ARP restores
-that saved version and clears the combo's tail. ENV also clears its tail and
-opens the original FX. These modes cannot run simultaneously. The independent
-LFO filter can still process the combo output. OCT continues to skip in place,
-REC/SEQ keep their favorites functions, and GLO opens WiFi.
+The combo preserves the sampler's clip and processes its playback. ENV clears
+the combo's tail and opens the original exclusive held-key FX. Save a clip before
+entering ENV. The independent LFO filter can still process the combo output.
+OCT continues to skip in place outside ARP, REC/SEQ keep their favorites
+functions on the FX page, and GLO opens WiFi.
 
 ![FIELD Echo + Room](docs/images/field-space.png)
+
+Hold **FX in ARP** for 450 ms to open Echo + Room. Playback, latched loops,
+the live-monitor mute and the clip survive the transition. Play the keyboard
+on the FX page; press ARP to return to editing with the effect running. Echo +
+Room processes the sample/live mix before the LFO filter. Its separate 12 KiB
+buffer is allocated on demand only when at least 24 KiB of heap will remain;
+otherwise “FX memory low” leaves the current sample and page intact. Existing
+stream/PCM buffers retain their sizes. ENV releases this buffer for its separate
+held-key mode.
 
 Near is anchored when EDIT enables it and survives power-off. It does not drift
 with each skip. Its first selection scans the location index, potentially taking
@@ -162,10 +167,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.11-alpha
+  python3 base/tools/build.py app --release 0.1.12-alpha
 ```
 
-This produces `app/build/field-0.1.11-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.12-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

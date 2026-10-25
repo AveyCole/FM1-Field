@@ -29,7 +29,7 @@ press FX
 wait 500
 expect page 11
 expect space_active 1
-expect sam_state 0
+expect sam_state 2
 expect tempo_bpm 120
 release FX
 expect page 11
@@ -68,7 +68,7 @@ wait 400
 expect space_active 1
 expect ap_sound 2
 tap ARP
-expect space_active 0
+expect space_active 1
 expect sam_state 2
 expect sam_len 21824
 tap HOME

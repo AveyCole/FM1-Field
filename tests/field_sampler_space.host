@@ -1,0 +1,77 @@
+wait 6000
+tap ARP
+tap REC
+wait 3000
+expect sam_state 2
+expect sam_len 21824
+turn ALGO -1
+tap SEL
+tap SEL
+expect sam_loop 2
+key 7 down
+key 7 up
+expect sam_voice 1
+screen_mem 20000
+press FX
+wait 500
+release FX
+expect page 6
+expect space_active 0
+expect sam_state 2
+expect sam_voice 1
+screen_mem 1000000
+press FX
+wait 447
+expect page 6
+wait 2
+expect page 11
+release FX
+expect tempo_bpm 120
+expect sam_active 1
+expect sam_state 2
+expect sam_len 21824
+expect sam_voice 1
+expect space_active 1
+turn K4 40
+turn K2 20
+turn K3 20
+wait 1000
+peakreset
+wait 300
+expect peak_db_min -65
+key 7 down
+key 7 up
+wait 200
+expect sam_voice 0
+peakreset
+wait 300
+expect peak_db_min -100
+wait 8000
+peakreset
+wait 300
+expect peak_db_max -80
+tap ARP
+expect page 6
+expect space_active 1
+expect sam_state 2
+expect sam_len 21824
+tap SEL
+expect sam_loop 3
+turn PRESET -2
+expect sam_slices 8
+tap SAVE
+tap HOME
+expect sam_active 0
+expect space_active 1
+key 5 down
+wait 200
+expect sam_voice 1
+key 5 up
+tap ARP
+tap ENV
+expect space_active 0
+expect sam_state 0
+tap ARP
+expect sam_state 2
+expect sam_len 21824
+expect sam_slices 8

@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.11-alpha
+# FIELD — experimental 0.1.12-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.11-alpha
+  python3 base/tools/build.py app --release 0.1.12-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -543,3 +543,35 @@ install/reinstall and saved-sample preservation checks.
 The first install from an older FIELD version still begins with that version's
 old handoff code and may need a power-cycle if it stalls. Subsequent updates
 from 0.1.11 use the new handoff. Never interrupt an active flash write.
+
+
+## Simultaneous sampler and Echo + Room (0.1.12)
+
+Hold FX in ARP, HOME or the regional player for 450 ms to open Echo + Room.
+Short presses retain tap tempo. ARP returns to the sampler editor without
+disabling the combo. Sample data, trim, slice settings and playback survive;
+the keyboard also plays the sample on the combo page. Latched loops continue,
+and held-loop key releases still stop the voice. The sampler's live-monitor
+mute remains in effect while editing Echo + Room; leaving that workspace
+restores the live monitor as before. REC retains its existing page behavior.
+
+The wet processor now runs after the live-monitor gain and sampler mix, before
+the LFO filter. It owns a separate on-demand 12,288-byte heap bank, leaving the
+sample's ADPCM bank untouched. Entry requires room for that bank plus a 24 KiB
+heap reserve, checks allocation failure and leaves audio/sample/page intact on
+failure. ENV frees the combo bank and retains its existing exclusive held-key
+FX behavior. Streaming's 80 KiB compressed reserve and 6,912-frame PCM buffer
+are unchanged; no extra static audio bank and no allocation in the renderer.
+
+The new host scenario tests unsaved-clip and latched-voice preservation, the
+450 ms boundary, successful and low-memory entry, keyboard latch stop from
+the FX page, return to ARP, slice editing and saving after using the combo.
+With the live source muted, the captured sample produces a -38.9 dBFS FX tail
+after its voice stops, then decays to silence. Existing DSP, capture, save,
+filter, tempo and all-pixel display tests pass. Hardware build checks pass:
+image 581328 B; RAM .data+.bss 130784 B of 131072; pool 308884 B of 311296.
+Physical-device audio and available WiFi heap still need user testing.
+
+Stock restore remains under investigation: the reported Windows/Chrome session
+exposed USB-Midi input without a matching output after loader handoff, and no
+stock write began. This release does not claim to fix that separate issue.
