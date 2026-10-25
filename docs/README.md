@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.12-alpha
+# FIELD — experimental 0.1.13-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.12-alpha
+  python3 base/tools/build.py app --release 0.1.13-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -575,3 +575,16 @@ Physical-device audio and available WiFi heap still need user testing.
 Stock restore remains under investigation: the reported Windows/Chrome session
 exposed USB-Midi input without a matching output after loader handoff, and no
 stock write began. This release does not claim to fix that separate issue.
+
+
+## WiFi password keyboard contrast (0.1.13)
+
+The palette change had left cream letters on white piano keys and white
+letters on cream raised keys. The password/network-name keyboard now uses
+forest-green labels on cream white keys, cream labels on dark-green raised
+keys, and forest-green labels on the orange held-key highlight. Character
+mapping, typing, delete, OCT layers and saved credentials are unchanged.
+
+Simulator screenshots were visually checked for lowercase, capitals,
+digits/symbols, simultaneous white/raised key highlights and typed password
+text. Hardware build checks pass: image 581328 B; RAM .data+.bss 130784 B of 131072; pool 308884 B of 311296. Sampler FX from 0.1.12 remains intact.

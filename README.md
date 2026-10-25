@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.12-alpha](docs/firmware/field-0.1.12-alpha.fwsc)**
+[Download 0.1.13-alpha](docs/firmware/field-0.1.13-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.12 update lets Echo + Room process sampler playback. Hold FX in ARP to open its controls without clearing the clip or interrupting a latched loop; ARP returns with the effect running. Software checks pass; physical-device testing is still needed.
+The 0.1.13 update restores contrast on WiFi password keyboard labels, including capitals, symbols and pressed keys. Sampler delay/reverb and its FX hold shortcut remain available. Simulator screens have been checked; physical-device testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -167,10 +167,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.12-alpha
+  python3 base/tools/build.py app --release 0.1.13-alpha
 ```
 
-This produces `app/build/field-0.1.12-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.13-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

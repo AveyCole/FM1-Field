@@ -398,10 +398,10 @@ static void ui_piano(int slot, uint32_t y, int layer, uint32_t held)
             int x = x0 + wi * kw;
             if (!t[0] && layer >= 0)
                 t[0] = '<';
-            cv_rect(x, 0, kw - 1, wh, (held >> k & 1u) ? K_CORAL : RGB(255, 255, 255));
+            cv_rect(x, 0, kw - 1, wh, (held >> k & 1u) ? K_CORAL : K_TEXT);
             cv_rect(x + kw - 1, 0, 1, wh, K_LINE);
             cv_text(x + (kw - 1 - text_w(&FONT_XS, t)) / 2, wh - 16, &FONT_XS, t,
-                    (held >> k & 1u) ? RGB(255, 255, 255) : K_TEXT);
+                    K_BG);
             wi++;
         }
     wi = 0;
@@ -413,8 +413,8 @@ static void ui_piano(int slot, uint32_t y, int layer, uint32_t held)
         {
             char t[2] = {layer < 0 ? 0 : pw_char(k, layer), 0};
             int x = x0 + wi * kw - 6;
-            cv_rect(x, 0, 12, bh, (held >> k & 1u) ? K_CORAL : K_TEXT);
-            cv_text(x + (12 - text_w(&FONT_XS, t)) / 2, 6, &FONT_XS, t, RGB(255, 255, 255));
+            cv_rect(x, 0, 12, bh, (held >> k & 1u) ? K_CORAL : K_BG);
+            cv_text(x + (12 - text_w(&FONT_XS, t)) / 2, 6, &FONT_XS, t, (held >> k & 1u) ? K_BG : K_TEXT);
         }
     }
     cv_blit(0, y);
