@@ -2,7 +2,30 @@
 #include "aporee.h"
 #include "fastmath.h"
 #include "regions.h"
+#include "field_fav.c"
 static void ui_page_set(int pg);
+static field_favs_t *ap_favs;
+static int ap_fav_cursor;
+static uint8_t ap_fav_status, ap_recalled;
+static uint32_t ap_fav_until;
+static void ap_fav_notice(unsigned status)
+{
+    ap_fav_status=(uint8_t)status;ap_fav_until=plat_ms()+3500u;
+}
+static void ap_fav_close(void) {free(ap_favs);ap_favs=0;}
+static void ap_fav_load(void)
+{
+    int n=plat_store_size(OBJ_FAV);
+    if(n<8 || n>(int)sizeof *ap_favs ||
+       plat_store_load(OBJ_FAV,ap_favs,sizeof *ap_favs)!=n || !field_favs_valid(ap_favs,n))
+        field_favs_clear(ap_favs);
+}
+static int ap_fav_open(void)
+{
+    if(!ap_favs) ap_favs=malloc(sizeof *ap_favs);
+    if(!ap_favs) {ap_fav_notice(7);return 0;}
+    ap_fav_load();ap_fav_cursor=0;return 1;
+}
 static uint16_t ap_active_region, ap_browse_country, ap_browse_pick;
 static uint8_t ap_browse_level;
 static int ap_browse_cursor, ap_browse_top;
@@ -30,6 +53,7 @@ static int sel_valid(void) { return 1; }
 static void ap_remember(void) { rset.playing = radio_want; rset_save(); }
 static void ap_shuffle(void)
 {
+    ap_recalled=0;
     ap_pending = 1; ap_retry = plat_ms(); radio_want = 1;
     if (wifi_st == WS_OFF) wifi_power(1);
     radio_stop(); play_url[0] = 0;
@@ -49,12 +73,12 @@ static void radio_ui_service(void)
     if (ap_audio_ended) { ap_audio_ended = 0; if (radio_want) ap_shuffle(); }
     if (ap_fetching && ap_state != AP_BUSY) {
         ap_fetching = 0;
-        if (ap_state == AP_DONE && !ap_pending) {
+        if (ap_state == AP_DONE && !ap_pending && !ap_recalled) {
             ap_now = ap_track;
             w_cpy(play_url, ap_now.url, sizeof play_url);
             radio_url = play_url; radio_unplayable = 0;
             ap_play_at = now; /* static globe: audio can start fetching immediately */
-        } else if (ap_state == AP_ERROR) { ap_pending = 1; ap_retry = now + 15000; }
+        } else if (ap_state == AP_ERROR && !ap_recalled) { ap_pending = 1; ap_retry = now + 15000; }
     }
     if (radio_want && ap_pending && !ap_fetching && wifi_st == WS_CONNECTED && (int32_t)(now-ap_retry) >= 0) {
         if (radio_st != RS_OFF) radio_stop();
@@ -66,6 +90,30 @@ static void radio_ui_service(void)
         radio_url = play_url; radio_play(0); ap_play_at = now + 15000;
     }
     if (!radio_want && radio_st != RS_OFF) radio_stop();
+}
+static void ap_fav_save(void)
+{
+    int result;
+    /* While changing sounds the old credits remain visible, but no longer
+     * describe the recording being requested. Do not bookmark them. */
+    if(!play_url[0] || ap_fetching || ap_pending || strcmp(play_url,ap_now.url)) {ap_fav_notice(4);return;}
+    if(!ap_fav_open()) return;
+    result=field_favs_add(ap_favs,&ap_now);
+    if(!result) result=plat_store_save(OBJ_FAV,ap_favs,8u+ap_favs->used)?-4:0;
+    ap_fav_notice(result==0?1:result==-2?2:result==-1?3:result==-4?5:4);
+    ap_fav_close();
+}
+static void ap_fav_play(void)
+{
+    if(!ap_favs || !ap_favs->count) return;
+    radio_stop();ap_audio_ended=0;
+    field_favs_read(ap_favs,(unsigned)ap_fav_cursor,&ap_now);
+    w_cpy(play_url,ap_now.url,sizeof play_url);radio_url=play_url;
+    ap_pending=0;ap_recalled=1;radio_want=1;ap_play_at=plat_ms();radio_unplayable=0;ap_info=0;
+    /* An in-flight metadata request must relinquish its network task before
+     * playback. ap_recalled prevents its result replacing this bookmark. */
+    if(wifi_st==WS_OFF) wifi_power(1);
+    ui_page_set(ap_player_page());
 }
 /* Coarse original outlines, latitude/longitude degrees. No map tiles or texture memory. */
 static const int16_t ap_coasts[][2] = {
@@ -168,7 +216,7 @@ static void ui_home(void)
         status=buffering;
     }
     ui_title(0,"FIELD",wifi_st==WS_CONNECTED?"WiFi":"GLO WiFi");
-    ap_left(0,ap_info?"RECORDING":ap_active_region?ap_region_name(ap_active_region):"WORLD / RANDOM",K_TEAL);
+    ap_left(0,ap_info?"RECORDING":ap_recalled?"FAVORITE":ap_active_region?ap_region_name(ap_active_region):"WORLD / RANDOM",K_TEAL);
     ap_left(1,ap_info?ap_now.artist:ap_now.place,K_TEXT);
     ap_left(2,ap_now.title[0]?ap_now.title:"Field recordings",K_TEXT);
     if(ap_info) ap_left(3,ap_now.licence,K_DIM);
@@ -176,9 +224,13 @@ static void ui_home(void)
     ap_coordinate(s,sizeof s,ap_now.lon,'E','W'); ap_left(4,ap_info?ap_now.id:play_url[0]?s:"",K_DIM);
     ap_left(5,status,K_CORAL);
     snprintf(s,sizeof s,"Index %u KB",(unsigned)(ap_bytes/1024));
-    ap_left(6,ap_fetching?s:"SEL details",K_DIM);
+    {
+        static const char *const messages[]={"SEL details","Favorite saved","Already saved","Favorites full",
+            "Wait for a sound","Save failed","Favorite removed","Not enough memory"};
+        ap_left(6,ap_fav_status && (int32_t)(ap_fav_until-plat_ms())>0?messages[ap_fav_status]:ap_fetching?s:"SEL details",K_DIM);
+    }
     ap_globe();
-    ui_row(13,214,26,"SAVE regions","OCT-/+ random",K_DIM,K_DIM,K_PANEL);
+    ui_row(13,214,26,"REC save","SEQ favorites",K_DIM,K_DIM,K_PANEL);
 }
 static void ap_regions_open(void)
 {
@@ -225,6 +277,36 @@ static void ui_regions(void)
     }
     ui_row(13,214,26,ap_browse_level==2?"SEL / PLAY listen":"SELECT move  SEL open","HOME up",K_DIM,K_DIM,K_PANEL);
 }
+static void ui_favorites(void)
+{
+    unsigned i;char count[20];
+    snprintf(count,sizeof count,"%u saved",ap_favs?(unsigned)ap_favs->count:0u);
+    ui_title(0,"Favorites",count);
+    ap_region_line(1,38,ap_fav_status==5 && (int32_t)(ap_fav_until-plat_ms())>0?"Save failed":
+        ap_favs && ap_favs->count?field_favs_string(ap_favs,(unsigned)ap_fav_cursor,2):"REC saves the current sound","",0);
+    for(i=0;i<6;i++) {
+        unsigned row=(unsigned)(ap_fav_cursor/6)*6+i;
+        ap_region_line(2+i,64+i*24,ap_favs && row<ap_favs->count?
+            field_favs_string(ap_favs,row,1):"","",ap_favs && row<ap_favs->count && row==(unsigned)ap_fav_cursor);
+    }
+    ui_row(13,214,26,"SEL play  REC remove","SEQ back",K_DIM,K_DIM,K_PANEL);
+}
+static void ap_fav_input(uint32_t down,int32_t turn)
+{
+    if(down&((1u<<B_SEQ)|(1u<<B_HOME))) {ui_page_set(ap_player_page());return;}
+    if(!ap_favs || !ap_favs->count) return;
+    ap_fav_cursor+=turn;
+    if(ap_fav_cursor<0) ap_fav_cursor=0;
+    if(ap_fav_cursor>=ap_favs->count) ap_fav_cursor=ap_favs->count-1;
+    if(down&(1u<<B_REC)) {
+        field_favs_delete(ap_favs,(unsigned)ap_fav_cursor);
+        if(plat_store_save(OBJ_FAV,ap_favs,8u+ap_favs->used)) {ap_fav_load();ap_fav_notice(5);}
+        else ap_fav_notice(6);
+        if(ap_fav_cursor && ap_fav_cursor>=ap_favs->count) ap_fav_cursor--;
+        ui_dirty=1;return;
+    }
+    if(down&((1u<<B_SEL)|(1u<<B_PLAY))) ap_fav_play();
+}
 static void ap_regions_play(void)
 {
     ap_active_region=ap_browse_region((unsigned)ap_browse_cursor);
@@ -254,13 +336,14 @@ static void ap_regions_input(uint32_t down,int32_t turn)
 static void ui_help(void)
 {
     ui_title(0,"Controls","");
-    ui_row(1,42,24,"OCT- or OCT+","random sound",K_TEXT,K_TEAL,K_BG);
-    ui_row(2,66,24,"PLAY","play / stop",K_TEXT,K_DIM,K_BG);
-    ui_row(3,90,24,"GLO","WiFi setup",K_TEXT,K_DIM,K_BG);
-    ui_row(4,114,24,"SEL","credits / details",K_TEXT,K_DIM,K_BG);
-    ui_row(5,138,24,"MASTER","volume",K_TEXT,K_DIM,K_BG);
-    ui_row(6,162,24,"Keys","hold for effects",K_TEXT,K_DIM,K_BG);
-    ui_row(7,186,24,"SAVE","browse regions",K_TEXT,K_DIM,K_BG);
+    ui_row(1,38,21,"OCT- / OCT+","random sound",K_TEXT,K_TEAL,K_BG);
+    ui_row(2,59,21,"PLAY","play / stop",K_TEXT,K_DIM,K_BG);
+    ui_row(3,80,21,"GLO","WiFi setup",K_TEXT,K_DIM,K_BG);
+    ui_row(4,101,21,"SEL","credits / details",K_TEXT,K_DIM,K_BG);
+    ui_row(5,122,21,"MASTER / keys","volume / FX",K_TEXT,K_DIM,K_BG);
+    ui_row(6,143,21,"REC","save favorite",K_TEXT,K_DIM,K_BG);
+    ui_row(7,164,21,"SEQ","favorites list",K_TEXT,K_DIM,K_BG);
+    ui_row(8,185,21,"SAVE","browse regions",K_TEXT,K_DIM,K_BG);
     ui_row(13,214,26,"Release HOME","",K_DIM,K_DIM,K_PANEL);
 }
 static void radio_ui_dump(void)

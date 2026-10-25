@@ -527,6 +527,7 @@ static void ui_draw(void)
     case PG_HOME: ui_home(); break;
     case PG_REGION: ui_home(); break;
     case PG_BROWSE: ui_regions(); break;
+    case PG_FAV: ui_favorites(); break;
     case PG_WIFI: ui_status(); break;
     case PG_NETS: ui_nets(); break;
     case PG_PASS: ui_pass(); break;
@@ -537,6 +538,7 @@ static void ui_draw(void)
 
 static void ui_page_set(int pg)
 {
+    if(ui_page==PG_FAV && pg!=PG_FAV) ap_fav_close();
     ui_page = (uint8_t)pg;
     ui_dirty = 1;
     ui_msg[0] = 0;
@@ -676,6 +678,8 @@ void app_say(const char *a, const char *b)
 
 void app_ui_init(void)
 {
+    ap_fav_close(); /* also reload from simulated flash after a host reboot */
+    if(ui_page==PG_FAV) ui_page=(uint8_t)ap_player_page();
     radio_ui_restore();                           /* the place and station of the last session, playing if it was */
     if (plat_wifi_saved(0, 0)) {                  /* a radio: WiFi on by itself when it knows a network */
         wifi_power(1);
@@ -728,6 +732,8 @@ static void input(void)
         if (down & ((1u << B_OCTDN) | (1u << B_OCTUP))) ap_shuffle();
         if (down & (1u << B_SEL)) ap_info = !ap_info;
         if (down & (1u << B_SAVE)) {ap_regions_open();ui_page_set(PG_BROWSE);}
+        if (down & (1u << B_REC)) ap_fav_save();
+        if ((down & (1u << B_SEQ)) && ap_fav_open()) {ui_page_set(PG_FAV);return;}
         if (ui_page == PG_REGION && (down & (1u << B_HOME))) {
             ap_active_region=0;ap_shuffle();ui_page_set(PG_HOME);
         }
@@ -735,6 +741,8 @@ static void input(void)
         (void)plat_enc(EN_K1); (void)plat_enc(EN_K2); (void)plat_enc(EN_K3);
     } else if (ui_page == PG_BROWSE) {
         ap_regions_input(down,turn);
+    } else if (ui_page == PG_FAV) {
+        ap_fav_input(down,turn);
     } else if (ui_page == PG_WIFI) {
         if (down & (1u << B_PLAY))
             wifi_power(wifi_st == WS_OFF);
@@ -838,6 +846,16 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
         *got = ui_page;
     else if (!strcmp(what, "ap_lat"))
         *got = ap_now.lat;
+    else if (!strcmp(what, "ap_favorites"))
+        *got = ap_favs ? ap_favs->count : -1;
+    else if (!strcmp(what, "ap_fav_status"))
+        *got = ap_fav_status;
+    else if (!strcmp(what, "ap_fav_cursor"))
+        *got = ap_fav_cursor;
+    else if (!strcmp(what, "ap_sound"))
+        *got = atoi(ap_now.id);
+    else if (!strcmp(what, "ap_url_matches"))
+        *got = !strcmp(play_url,ap_now.url);
     else if (!strcmp(what, "ap_want"))
         *got = radio_want;
     else if (!strcmp(what, "ap_completed"))
@@ -886,7 +904,7 @@ static void lights(void)
     uint32_t lb = 0, lk = 0;
     if (ui_page == PG_HOME || ui_page == PG_REGION) {
         int w;
-        lb = 1u << B_PLAY | 1u << B_GLO | 1u << B_SEL | 1u << B_SAVE | 1u << B_OCTDN | 1u << B_OCTUP;
+        lb = 1u << B_PLAY | 1u << B_GLO | 1u << B_SEL | 1u << B_SAVE | 1u << B_REC | 1u << B_SEQ | 1u << B_OCTDN | 1u << B_OCTUP;
         if(ui_page==PG_REGION) lb|=1u<<B_HOME;
         if ((plat_ms() - tempo_t0) % (60000u / tempo_bpm) < 90u)
             lb |= 1u << B_FX;                     /* FX flashes on the beat */
@@ -896,6 +914,9 @@ static void lights(void)
                     lk |= 1u << WHITE_KEY[w];
     } else if (ui_page == PG_BROWSE) {
         lb = 1u << B_SEL | 1u << B_HOME | 1u << B_PLAY;
+    } else if (ui_page == PG_FAV) {
+        lb = 1u << B_HOME | 1u << B_SEQ | 1u << B_GLO;
+        if(ap_favs && ap_favs->count) lb |= 1u << B_SEL | 1u << B_PLAY | 1u << B_REC;
     } else if (ui_page == PG_WIFI) {
         lb = 1u << B_PLAY | 1u << B_SEL | 1u << B_HOME | 1u << B_GLO;
     } else if (ui_page == PG_NETS) {
@@ -977,6 +998,7 @@ volatile uint32_t ap_bytes;
 char ap_why[32];
 ap_track_t ap_track;
 static unsigned host_pick;
+static uint32_t host_metadata_at;
 static FILE *host_stream;
 static uint8_t *host_ring;
 static uint32_t host_ring_size, host_stream_t0, host_stream_tick;
@@ -985,6 +1007,7 @@ static void host_net_poll(void)
 {
     uint32_t now=plat_ms(),room,n,at,elapsed;
     const char *stall;
+    if(ap_state==AP_BUSY && (int32_t)(now-host_metadata_at)>=0) ap_state=AP_DONE;
     if(!host_stream || now==host_stream_tick) return;
     host_stream_tick=now;elapsed=now-host_stream_t0;
     stall=getenv("APOREE_TEST_STALL");
@@ -1011,13 +1034,19 @@ static void host_net_poll(void)
 int ap_start(uint16_t region) {
     (void)region;
     memset(&ap_track,0,sizeof ap_track);
-    w_cpy(ap_track.url,"https://aporee.org/maps/files/host-fixture.mp3",sizeof ap_track.url);
-    w_cpy(ap_track.title,"SIMULATED recording",sizeof ap_track.title);
+    snprintf(ap_track.url,sizeof ap_track.url,"https://aporee.org/maps/files/host-fixture-%u.mp3",host_pick+1);
+    snprintf(ap_track.id,sizeof ap_track.id,"%u",host_pick+1);
+    snprintf(ap_track.title,sizeof ap_track.title,"SIMULATED recording %u",host_pick+1);
     w_cpy(ap_track.place,host_pick++%2?"Tokyo, Japan":"Berlin, Germany",sizeof ap_track.place);
     ap_track.lat=host_pick%2?525200:356800; ap_track.lon=host_pick%2?134050:1396900;
     w_cpy(ap_track.artist,"Host test fixture",sizeof ap_track.artist);
     w_cpy(ap_track.licence,"SIMULATED",sizeof ap_track.licence);
-    ap_state=AP_DONE; return 0;
+    {
+        const char *delay=getenv("APOREE_TEST_METADATA_DELAY");
+        host_metadata_at=plat_ms()+(delay?(unsigned)atoi(delay):0u);
+        ap_state=delay?AP_BUSY:AP_DONE;
+    }
+    return 0;
 }
 int radio_net_start(const char *u,uint8_t *b,uint32_t n) {
     const char *fixture=getenv("APOREE_TEST_MP3");

@@ -1,0 +1,66 @@
+# Persistent exact-recording bookmarks, independent of the random selection.
+wait 3500
+expect ap_sound 1
+tap SEQ
+expect page 7
+expect ap_favorites 0
+tap PLAY
+expect page 7
+tap SEQ
+tap REC
+expect ap_fav_status 1
+tap REC
+expect ap_fav_status 2
+tap OCT+
+wait 400
+expect ap_sound 2
+flash_fail 1
+tap REC
+expect ap_fav_status 5
+tap SEQ
+expect ap_favorites 1
+tap SEQ
+flash_fail 0
+tap REC
+expect ap_fav_status 1
+tap SEQ
+expect ap_favorites 2
+shot field-favorites.png
+turn SELECT 1
+expect ap_fav_cursor 1
+tap PLAY
+expect page 0
+expect ap_sound 2
+expect ap_url_matches 1
+tap SEQ
+tap SEL
+expect ap_sound 1
+expect ap_lat 525200
+expect ap_url_matches 1
+shot field-favorite-replay.png
+tap SEQ
+flash_fail 1
+tap REC
+expect ap_fav_status 5
+expect ap_favorites 2
+flash_fail 0
+tap REC
+expect ap_fav_status 6
+expect ap_favorites 1
+reboot
+wait 200
+tap SEQ
+expect page 7
+expect ap_favorites 1
+tap SEL
+expect ap_sound 2
+expect ap_lat 356800
+expect ap_url_matches 1
+tap SEQ
+tap REC
+expect ap_favorites 0
+reboot
+wait 200
+tap SEQ
+expect ap_favorites 0
+shot field-favorites-empty.png

@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.4-alpha](docs/firmware/field-0.1.4-alpha.fwsc)**
+[Download 0.1.5-alpha](docs/firmware/field-0.1.5-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.4 update doubles the TCP receive window and uses nearly the full audio reserve at startup/refill. It retains the decoder scheduling fix, battery indicator and updated USB flasher. Software checks pass; this build still needs physical-device testing.
+The 0.1.5 update adds persistent recording favorites on REC and SEQ. It retains the network throughput and playback reserve improvements, battery indicator and updated USB flasher. Software checks pass; this build still needs physical-device testing.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
@@ -23,14 +23,21 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | Control | Action |
 | --- | --- |
 | OCT− / OCT+ | Another random recording, within the current region |
+| REC | Save the current recording; remove the highlighted favorite while in the favorites list |
+| SEQ | Open favorites; press again to return |
 | SAVE | Browse country → state/province → Play random here |
 | SELECT / SEL | Move / open in the browser; SEL on the player shows author/licence details |
-| PLAY | Play / stop; start the highlighted region in the browser |
+| PLAY | Play / stop; start the highlighted region or favorite |
 | HOME | Up in the browser; worldwide random from the regional player |
 | GLO | WiFi setup (2.4 GHz) |
 | MASTER | Volume |
 | White keys | Hold for audio effects |
 | ARP | Optional synth |
+
+In favorites, turn SELECT to move, then press SEL or PLAY to replay that exact recording.
+Favorites survive power-off. Up to 16 fit in a separate 3,840-byte flash object; long
+URLs and credits can fill it sooner. A full list asks you to remove an entry.
+These are online bookmarks: playback still requires WiFi and the recording to remain available.
 
 First startup downloads Aporee's location index and takes about three minutes,
 longer on a weak connection. Choosing a new region requires another index scan;
@@ -52,10 +59,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.4-alpha
+  python3 base/tools/build.py app --release 0.1.5-alpha
 ```
 
-This produces `app/build/field-0.1.4-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.5-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

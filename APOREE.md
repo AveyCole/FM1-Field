@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.4-alpha
+# FIELD — experimental 0.1.5-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -123,7 +123,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.4-alpha
+  python3 base/tools/build.py app --release 0.1.5-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -224,3 +224,36 @@ actual MIDI port names, states, connection states and probe/open errors locally.
 Tests cover delayed loader appearance, a fresh MIDI-access object, unequal
 labels, multiple outputs and Windows-prefixed names. Firmware 0.1.4-alpha is
 unchanged. These tests do not establish actual host-driver behavior.
+
+## Recording favorites (0.1.5)
+
+REC on the player saves the current exact recording, with its URL, sound ID,
+coordinates, title, place, author and licence. SEQ opens the saved list; SELECT
+moves, SEL or PLAY recalls the highlighted sound, REC removes it, and SEQ or HOME
+returns. The player labels a recalled sound FAVORITE. OCT skips retain the current
+random region. WiFi is still required; audio files are not downloaded to flash.
+
+Bookmarks use the existing OBJ_FAV sector pair with a new validated format,
+independent of WiFi and radio settings. Up to 16 entries share 3,840 bytes of
+variable-length storage; long metadata can reach the byte limit sooner. URLs and
+credits are never truncated. Duplicate saves avoid flash writes. Full storage,
+allocation failure, and flash write failure give feedback; a failed removal
+reloads the previously saved list. Malformed or legacy station-favorite objects
+are ignored. The 3,840-byte list is allocated only during a save or while the list
+is open and released on leaving it; permanent RAM grows by 32 bytes.
+
+An in-flight random metadata request is allowed to finish but cannot replace a
+recalled bookmark or overlap its audio network task. The existing compressed and
+PCM buffers, streaming scheduling, battery indicator and USB discovery fixes are
+retained.
+
+Validation: packed-storage unit tests cover exact URL and credit round trips,
+duplicates, both capacity limits, malformed storage and removal. Host UI tests
+cover navigation, exact replay, failed writes, reboot persistence, empty lists,
+and recall during a delayed metadata request. Region/player, streaming crypto,
+cooperative scheduling and USB handoff regressions pass. Hardware compilation
+and memory/register checks pass: image 578752 B; RAM .data+.bss 130528 B of 131072; pool 308880 B of 311296. Physical FM-1 testing remains necessary.
+
+Run the new tests with `PYTHON=python3 sh tests/run_field_favorites.sh` (requires
+the host build dependencies), plus `sh tests/run_stream_tests.sh` and
+`node tests/usb_handoff_test.mjs`.

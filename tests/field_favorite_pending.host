@@ -1,0 +1,20 @@
+# Run with APOREE_TEST_METADATA_DELAY=800. Recalling a saved recording must
+# win over a random metadata request already using the network task.
+wait 3500
+tap REC
+expect ap_fav_status 1
+tap OCT+
+wait 100
+tap REC
+expect ap_fav_status 4
+tap SEQ
+tap PLAY
+expect ap_sound 1
+expect ap_url_matches 1
+wait 1200
+expect ap_sound 1
+expect ap_url_matches 1
+expect ap_lat 525200
+tap OCT+
+wait 1200
+expect ap_sound 3
