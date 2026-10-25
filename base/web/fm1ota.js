@@ -101,7 +101,15 @@ class Link {
     }
     return this.q.shift() || null;
   }
-  close() { this.input.onmidimessage = null; }
+  async close() {
+    this.input.onmidimessage = null;
+    if (this.waiter) { const wake = this.waiter; this.waiter = null; wake(); }
+    // Release the native MIDI handles as well as the JS callback. Windows can
+    // retain the old handles while the FM-1 re-enumerates as its update loader.
+    await Promise.allSettled([this.input, this.output].map(async (port) => {
+      if (port.close) await port.close();
+    }));
+  }
 }
 
 async function handshake(link, tries = 3) {
@@ -147,23 +155,54 @@ export class Updater {
   constructor(access, log) {
     this.access = access;
     this.log = log || (() => {});
+    this.links = new Set();
   }
 
-  // every in/out pair with the same port name that answers the handshake
+  // Only probe known FM-1 product/loader names, then verify its identity.
   async find(filter) {
-    const outs = [...this.access.outputs.values()];
-    for (const input of this.access.inputs.values()) {
-      if (input.state === "disconnected") continue;
-      if (!/fm-?1|felucca|ota|composite|sinco|usb-midi/i.test(input.name || "")) continue;   // never probe other gear
-      const output = outs.find((o) => o.name === input.name) || (outs.length === 1 ? outs[0] : null);
-      if (!output) continue;
-      try { await input.open(); await output.open(); } catch (_) { continue; }
-      const link = new Link(input, output);
-      const id = await handshake(link, 2);
-      if (id && (!filter || filter(id))) return { link, id, name: input.name };
-      link.close();
+    const known = (port) => /fm-?1|felucca|ota|composite|sinco|usb-midi|^field\b|^aporee\b/i.test(port.name || "");
+    const outs = [...this.access.outputs.values()].filter((p) => p.state !== "disconnected" && known(p));
+    for (const input of [...this.access.inputs.values()]) {
+      if (input.state === "disconnected" || !known(input)) continue;
+      const same = outs.filter((p) => p.name === input.name);
+      const candidates = same.length ? same : outs.length === 1 ? outs : [];
+      for (const output of candidates) {
+        // Each failed probe must release both ports, including partial opens.
+        const link = new Link(input, output);
+        let keep = false;
+        try {
+          await input.open(); await output.open();
+          if (link.lost) continue;
+          const id = await handshake(link, 2);
+          if (id && (!filter || filter(id))) {
+            keep = true;
+            this.links.add(link);
+            return { link, id, name: input.name };
+          }
+        } catch (_) { /* the OS may still be replacing this MIDI endpoint */ }
+        finally { if (!keep) await link.close(); }
+      }
     }
     return null;
+  }
+
+  async release() {
+    await Promise.allSettled([...this.links].map((link) => link.close()));
+    this.links.clear();
+  }
+
+  async portsChanged(ms) {
+    // Listen without replacing another consumer's statechange handler. Polling
+    // remains a fallback for browsers that report the re-enumeration late.
+    await new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.access.removeEventListener?.("statechange", done);
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      this.access.addEventListener?.("statechange", done);
+    });
   }
 
   async waitFor(filter, ms) {
@@ -171,7 +210,7 @@ export class Updater {
     while (Date.now() < end) {
       const dev = await this.find(filter);
       if (dev) return dev;
-      await sleep(1000);
+      await this.portsChanged(Math.max(0, Math.min(500, end - Date.now())));
     }
     return null;
   }
@@ -212,13 +251,13 @@ export class Updater {
     const dev = await this.find((id) => !IS_OTA(id));
     if (!dev) throw fail("notfound", "FM-1 not found (USB cable, and no other app using it?)");
     const [model] = product.split("_");
-    if (dev.id.model !== model) { dev.link.close(); throw fail("model", `the device is ${dev.id.text}, the package is for ${product}`); }
+    if (dev.id.model !== model) { await dev.link.close(); throw fail("model", `the device is ${dev.id.text}, the package is for ${product}`); }
     if (dev.id.open) await this.arm(dev, image, product, sha256);
     step("start", dev.id.text);
     dev.link.send(UPGRADE);
     await sleep(2000);
     const s1 = await this.serve(dev.link, image, 0xE0000000, 8000, (n, b) => step("verify", n, b));
-    dev.link.close();
+    await dev.link.close();
     if (!s1.finished) throw fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
     step("loader");
     await sleep(3000);
@@ -230,7 +269,7 @@ export class Updater {
     await sleep(3000);
     const back = await this.waitFor((id) => !IS_OTA(id), 40000);
     if (!back) throw fail("noreturn", "the device did not come back: power-cycle it");
-    back.link.close();
+    await back.link.close();
     if (back.id.text !== product) throw fail("mismatch", `installed, but the device reports ${back.id.text}`, back.id.text);
     step("done", back.id.text);
     return back.id.text;
@@ -248,13 +287,13 @@ export class Updater {
     dev.link.send(UPGRADE);
     await sleep(2000);
     const s = await this.serve(dev.link, image, 0xE0000000, 8000);
-    dev.link.close();
+    await dev.link.close();
     if (!s.finished) throw fail(s.lost ? "lost" : "bootrefused", `m-bootloader: the device stopped after ${s.served} requests: nothing was written`);
     step("bootwrite");
     await sleep(3000);
     const back = await this.waitFor((id) => !IS_OTA(id), 40000);
     if (!back) throw fail("noreturn", "the device did not come back: power-cycle it");
-    back.link.close();
+    await back.link.close();
     step("bootdone", back.id.text);
     return back.id.text;
   }
@@ -262,19 +301,19 @@ export class Updater {
   // M-VAVE's Open firmware: allow the update of M-VAVE's own firmware (sha256: the package file's, hex)
   async arm(dev, image, product, sha256) {
     if (!IS_STOCK(product) || !/^[0-9a-f]{64}$/.test(sha256 || "")) {
-      dev.link.close();
+      await dev.link.close();
       throw fail("open", `This FM-1 runs M-VAVE's ${dev.id.text} firmware. Put the stock firmware back first ("Back to the stock firmware"), then install this.`, dev.id.text);
     }
     const cap = await query(dev.link, 49);
     if (!cap || cap.length !== 47 || String.fromCharCode(...cap.slice(0, 4)) !== "FMC1" || cap[6] !== 0) {
-      dev.link.close();
+      await dev.link.close();
       throw fail("stopped", `${dev.id.text} did not accept the update: nothing was written`);
     }
     const n = image.length;
     const tag = sha256.match(/../g).map((h) => parseInt(h, 16));
     const ack = await query(dev.link, 50, [1, cap[5], n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF, ...tag]);
     if (!ack || ack.length !== 1 || ack[0] !== 0) {
-      dev.link.close();
+      await dev.link.close();
       throw fail("stopped", `${dev.id.text} refused the package: nothing was written`);
     }
   }
@@ -284,7 +323,7 @@ export class Updater {
     ota.link.send(UPGRADE);
     await sleep(2000);
     const s2 = await this.serve(ota.link, image, 0xF0000000, 180000, (n, b) => step("write", n, b));
-    ota.link.close();
+    await ota.link.close();
     return s2;
   }
 

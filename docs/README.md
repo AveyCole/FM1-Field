@@ -171,3 +171,16 @@ fm1-base's package checks, USB-MIDI transfer, stock restore and crash-report UI.
 image 576672 B; RAM .data+.bss 130496 B of 131072; pool 308880 B of 311296. The hardware image, RAM, pool-headroom and register-access
 checks passed. The startup name and USB product are FIELD; package identity
 remains in the compatible FM-1_84 family (`FM-1_84000103`).
+
+## USB flasher handoff update
+
+The browser updater now explicitly closes native MIDI input/output handles before
+loader discovery, awaits those closes, ignores disconnected output endpoints, and
+recognizes FIELD product names. It wakes on MIDI state changes and retries from
+fresh endpoint lists, with cleanup after partial opens and failed installs.
+Firmware 0.1.3-alpha is unchanged; refresh the main page to use the new updater.
+
+Run `node tests/usb_handoff_test.mjs` for the simulated firmware-to-loader-to-firmware
+transition that requires old handles to close before re-enumeration. It also checks
+stale endpoints, partial-open failures and event-listener cleanup. Physical USB
+behavior still depends on the browser and host driver and needs a device test.
