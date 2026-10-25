@@ -351,13 +351,13 @@ const TEXT = {
     newtab: "（新しいタブで開きます）", progress: "進行状況", pct: " {n}%",
     warn: "書き込み中は USB を抜かないでください。",
     install: "インストール", other: "English",
-    manual: "FM1 Field のページへ",
+    manual: "FIELD のページへ",
     direct: "USB ケーブルはパソコンに直接つないでください。Probe や Transporter などの機材は不要です。",
     brick: "万一 FM-1 が起動しなくなった場合は、Mac から標準ファームウェアに戻せます:",
     bricklink: "起動しない FM-1 の復旧（英語）",
     back: "公式ファームウェアに戻すには、このページ下の「純正ファームウェアに戻す」か、M-VAVE 公式のアップデーター M-UPGRADE（Downloads → PC Software → M-UPGRADE）を使います。",
     stockh: "純正ファームウェアに戻す",
-    stockwhy: "M-VAVE の FM-1 ファームウェアを、FM1 Field（またはそのセーフモード）から同じ USB ケーブルで書き込みます。FM1 Field で保存したものは消えることがあります。",
+    stockwhy: "M-VAVE の FM-1 ファームウェアを、FIELD（またはそのセーフモード）から同じ USB ケーブルで書き込みます。FIELD で保存したものは消えることがあります。",
     stock1: "M-VAVE の FM-1 ファームウェアをダウンロード:",
     stock2: "ダウンロードしたファイルを選ぶ:",
     stock3: "FM-1 を USB で接続し、下のボタンを押す。",
@@ -382,32 +382,32 @@ const TEXT = {
     reporth: "不具合を報告する",
     reportwhy: "FM-1 がクラッシュしたら、電源を切らずに USB で接続し、下のボタンを押してください。クラッシュの記録は再起動では残りますが、電源を切ると消えます。表示された内容をコピーして、何をしていたかと一緒に送ってください。",
     reportread: "クラッシュの記録を読む", reportcopy: "コピー", reportlabel: "クラッシュの記録",
-    reportwait: "読み込み中…", reportnone: "応答がありません。FM-1 が FM1 Field を実行しているか確かめてください。",
+    reportwait: "読み込み中…", reportnone: "応答がありません。FM-1 が FIELD を実行しているか確かめてください。",
     reportok: "読み込みました。コピーして送ってください。", reportcopied: "コピーしました。",
     mboot: "m-bootloader も書き込む: 電源を入れるときに PLAY を押したままでリカバリーメニュー、REC でアップデートモード。ファームウェアが起動しないときにも使えます。",
     mbootwhy: "Julius Vitkauskas によるオープンなブートローダー（MIT）。M-VAVE のブートローダーと置き換わり、ファームウェアを更新しても残ります。「純正ファームウェアに戻す」で M-VAVE のものに戻ります。メニューの WIPE USER DATA は、ファームウェアが保存したものをすべて消去します。",
     confirmh: "インストールの前に",
     confirm1: "書き込み中、FM-1 の画面には UPDATING と進み具合が出るか、暗いままになります。このページに「完了しました」と出るまで、USB ケーブルを抜いたり電源を切ったりしないでください。数分かかることがあります。",
     confirmboot: "ファームウェアの後に m-bootloader を書き込みます。FM-1 はその間にもう一度再起動します。",
-    bakh: "先にバックアップを。", confirmbak: "書き込みで FM1 Field に保存したものが消えることがあります。",
+    bakh: "先にバックアップを。", confirmbak: "書き込みで FIELD に保存したものが消えることがあります。",
     bakok: "バックアップを取った（または残したいものはない）",
-    backuplink: "FM1 Field をバックアップする", confirmgo: "書き込む", confirmcancel: "キャンセル",
+    backuplink: "FIELD をバックアップする", confirmgo: "書き込む", confirmcancel: "キャンセル",
     bootstart: "m-bootloader を書き込み中", bootwrite: "m-bootloader を書き込み中。FM-1 は自動で再起動します",
     bootdone: "完了しました（m-bootloader 付き）",
-    bootrefused: "FM1 Field はインストールされましたが、m-bootloader は書き込めませんでした。ほかは何も変わっていません。",
+    bootrefused: "FIELD はインストールされましたが、m-bootloader は書き込めませんでした。ほかは何も変わっていません。",
   },
   en: {
     intro: "Connect the FM-1 by USB, then press Install. It works in Chrome or Edge; the browser asks once to allow MIDI: allow it.",
     newtab: " (opens in a new tab)", progress: "Progress", pct: ", {n} percent",
     warn: "Do not unplug the USB cable while writing.",
     install: "Install", other: "日本語",
-    manual: "Back to FM1 Field",
+    manual: "Back to FIELD",
     direct: "Connect the USB cable directly to the computer. No probe or Transporter is needed.",
     brick: "If the FM-1 no longer starts, a Mac can put the stock firmware back:",
     bricklink: "recovering an FM-1 that won't start",
     back: "To go back to the official firmware, use \"Back to the stock firmware\" below, or M-VAVE's own updater, M-UPGRADE (Downloads → PC Software → M-UPGRADE).",
     stockh: "Back to the stock firmware",
-    stockwhy: "This writes M-VAVE's own FM-1 firmware back, from FM1 Field (or its safe mode, or another firmware with the same update entry) over the same USB cable. What FM1 Field saved may be lost.",
+    stockwhy: "This writes M-VAVE's own FM-1 firmware back, from FIELD (or its safe mode, or another firmware with the same update entry) over the same USB cable. What FIELD saved may be lost.",
     stock1: "Download M-VAVE's FM-1 firmware:",
     stock2: "Choose the file you downloaded:",
     stock3: "Connect the FM-1 by USB and press the button below.",
@@ -432,19 +432,19 @@ const TEXT = {
     reporth: "Report a problem",
     reportwhy: "If the FM-1 crashed, don't switch it off: connect it by USB and press the button below. The crash record survives a restart, but not switching off. Copy what appears and send it, with what you were doing at the time.",
     reportread: "Read the crash report", reportcopy: "Copy", reportlabel: "Crash report",
-    reportwait: "Reading…", reportnone: "No answer. Check that the FM-1 is running FM1 Field.",
+    reportwait: "Reading…", reportnone: "No answer. Check that the FM-1 is running FIELD.",
     reportok: "Read. Copy it and send it.", reportcopied: "Copied.",
     mboot: "Also install m-bootloader: hold PLAY while switching on for a recovery menu, or REC for update mode, even when a firmware won't start.",
     mbootwhy: "An open bootloader by Julius Vitkauskas (MIT). It replaces M-VAVE's bootloader and stays through firmware updates; \"Back to the stock firmware\" puts M-VAVE's back. Its menu's WIPE USER DATA erases everything firmwares have saved.",
     confirmh: "Before you install",
     confirm1: "While it is written, the FM-1's screen shows UPDATING and a bar, or stays dark. Don't unplug the USB cable or switch the FM-1 off until this page says Done. It can take several minutes.",
     confirmboot: "m-bootloader is written after the firmware: the FM-1 restarts once more for it.",
-    bakh: "Back up first.", confirmbak: "Installing can lose what FM1 Field has saved.",
+    bakh: "Back up first.", confirmbak: "Installing can lose what FIELD has saved.",
     bakok: "I've backed up, or have nothing to keep.",
-    backuplink: "Back up FM1 Field", confirmgo: "Install", confirmcancel: "Cancel",
+    backuplink: "Back up FIELD", confirmgo: "Install", confirmcancel: "Cancel",
     bootstart: "Installing m-bootloader", bootwrite: "Installing m-bootloader: the FM-1 restarts by itself",
     bootdone: "Done, with m-bootloader",
-    bootrefused: "FM1 Field is installed, but m-bootloader could not be: nothing else was changed.",
+    bootrefused: "FIELD is installed, but m-bootloader could not be: nothing else was changed.",
   },
 };
 let lang = "en";                                 /* English first; 日本語 is a click away */
@@ -487,7 +487,7 @@ const log = (t) => {
   if (atEnd) el.scrollTop = el.scrollHeight;
 };
 let image = null, boot = null;
-const meta = {"version": "0.1.2-alpha", "product": "FM-1_84000102", "pkg": new URL("firmware/aporee-0.1.2-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
+const meta = {"version": "0.1.3-alpha", "product": "FM-1_84000103", "pkg": new URL("firmware/field-0.1.3-alpha.fwsc", import.meta.url).href, "backup": false, "boot": null};
 
 /* the backup: a requirement before every install; the link where the site has the backup page */
 document.querySelectorAll(".baklink").forEach((a) => { a.hidden = !meta.backup; });
@@ -504,7 +504,7 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     const pkg = new Uint8Array(await r.arrayBuffer());
     if (productOf(pkg) !== meta.product) { sayK("badpkg"); return; }
     image = logicalImage(pkg);
-    say(`FM1 Field ${meta.version}`);
+    say(`FIELD ${meta.version}`);
     $("go").disabled = false;
   } catch (e) { sayK("loadfail", e.message); }
   /* m-bootloader: offered only when its package is here and is the one the site was made with */

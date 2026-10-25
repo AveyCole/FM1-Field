@@ -232,6 +232,28 @@ static void block(void)
 void shim_run(void)
 {
     int pass, i;
+#if SHIM_WIFI
+    /* Network tasks yield inside TLS records. Return to the app's decoder
+     * promptly instead of running another eight rounds first. Rotate the next
+     * slot so a busy early task cannot starve later WiFi/TCP tasks. */
+    static int next = 1;
+    uint32_t start = ticks_ms();
+    for (pass = 0; pass < 8; pass++) {
+        int ran = 0;
+        for (i = 1; i < NTASK; i++) {
+            int slot = next;
+            next = next == NTASK - 1 ? 1 : next + 1;
+            if (can_run(&tasks[slot])) {
+                switch_to(&tasks[slot]);
+                ran = 1;
+                if (ticks_ms() - start >= 4u)
+                    return;
+            }
+        }
+        if (!ran)
+            break;
+    }
+#else
     for (pass = 0; pass < 8; pass++) {
         int ran = 0;
         for (i = 1; i < NTASK; i++)
@@ -242,6 +264,7 @@ void shim_run(void)
         if (!ran)
             break;
     }
+#endif
 }
 
 extern volatile uint32_t shim_isr_blocks;

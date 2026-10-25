@@ -1,20 +1,22 @@
-# FM1 Field
+# FIELD
 
 An independent field-recording radio for the **M-VAVE FM-1**, powered by Radio Aporee.
 Browse the world, choose a country or state/province, and listen through a static globe UI.
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.2-alpha](docs/firmware/aporee-0.1.2-alpha.fwsc)**
+[Download 0.1.3-alpha](docs/firmware/field-0.1.3-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The new 0.1.2 region browser passes software checks and still needs physical-device testing.
+The 0.1.3 update addresses decoder starvation during HTTPS downloads and adds a battery indicator. Software checks pass; this build still needs physical-device testing.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
+
+The header shows a three-bar battery level, or `USB` when powered by an active USB host.
 
 ## Controls
 
@@ -39,7 +41,7 @@ It uses a snapshot of Aporee coordinates and generalized Natural Earth boundarie
 Offshore/unclassified points and newly added locations remain available worldwide.
 It is a browsing aid, not a precise border map. See [full notes and limitations](APOREE.md).
 
-The device/USB name remains **APOREE FM-1** in this alpha.
+The device screen and USB product name are **FIELD**.
 
 ## Build
 
@@ -50,10 +52,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.2-alpha
+  python3 base/tools/build.py app --release 0.1.3-alpha
 ```
 
-This produces `app/build/aporee-0.1.2-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.3-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.
@@ -72,7 +74,7 @@ real-world WiFi reliability on every FM-1.
 
 ## Website
 
-The complete static landing page and USB flasher live in `docs/`. GitHub Pages
+The main page flashes directly in place, with an inline confirmation and progress display. Recovery and crash-report tools are below it. The complete static landing page and USB flasher live in `docs/`. GitHub Pages
 publishes `main` → `/docs`. All links are relative so the site works under this
 repository's Pages path. Firmware downloads, checksums, and previous alphas are included.
 
@@ -87,4 +89,4 @@ all notices are retained in [LICENSING.md](LICENSING.md) and `LICENSES/`.
 
 Recordings come from [Radio Aporee](https://aporee.org/maps/) and retain their
 contributors' individual licences. Geography is made with Natural Earth (public domain).
-FM1 Field is independent of, and not endorsed by, Radio Aporee or M-VAVE.
+FIELD is independent of, and not endorsed by, Radio Aporee or M-VAVE.

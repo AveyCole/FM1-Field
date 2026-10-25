@@ -167,7 +167,7 @@ static void ui_home(void)
         snprintf(buffering,sizeof buffering,"Buffering %u%%",(unsigned)(percent>100?100:percent));
         status=buffering;
     }
-    ui_title(0,"APOREE",wifi_st==WS_CONNECTED?"WiFi":"GLO WiFi");
+    ui_title(0,"FIELD",wifi_st==WS_CONNECTED?"WiFi":"GLO WiFi");
     ap_left(0,ap_info?"RECORDING":ap_active_region?ap_region_name(ap_active_region):"WORLD / RANDOM",K_TEAL);
     ap_left(1,ap_info?ap_now.artist:ap_now.place,K_TEXT);
     ap_left(2,ap_now.title[0]?ap_now.title:"Field recordings",K_TEXT);

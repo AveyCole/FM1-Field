@@ -1,4 +1,4 @@
-# APOREE FM-1 — experimental 0.1.2-alpha
+# FIELD — experimental 0.1.3-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -72,6 +72,37 @@ Aporee. Author and licence metadata travel with each selected track. Aporee is
 not affiliated with this firmware. Upstream HTTPS transport does not validate
 server certificates; that existing limitation is retained.
 
+## Playback scheduling and battery (0.1.3)
+
+The compressed ring is still 80 KiB and PCM reserve 6,912 stereo frames.
+This release addresses CPU stalls rather than claiming that more buffering
+alone fixes them: a continuously readable HTTPS file could monopolize the
+cooperative network task, while the scheduler ran eight rounds before returning
+to the decoder. A 16 KiB TLS record also had no yields during AES/GHASH work.
+
+AES-CTR now uses BearSSL's constant-time implementation in 512-byte slices;
+GHASH is sliced at block boundaries too. Both yield between slices. Record
+authentication remains intact. The stream task also yields after each read.
+The WiFi scheduler returns after a 4 ms soft budget, checked after each task
+returns/yields, and rotates its starting slot so later tasks are not starved.
+This is cooperative, not a hard preemption guarantee for arbitrary SDK tasks.
+No HTTP downgrade, proxy, transcoding, or recording selection restriction is used.
+
+`sh tests/run_stream_tests.sh` verifies CTR/GHASH/GCM compatibility for
+AES-128/192/256, partial and full TLS records, authentication failure on altered
+tags, and slice yields. A timed scheduler harness with 13 runnable tasks and
+3 ms work slices reproduces a 312 ms old dispatch (longer than the 157 ms PCM
+reserve); the new scheduler returns within 6 ms and services every task. These
+are software regressions, not hardware throughput or drop-out measurements.
+Existing 320 kbps/1.5-second pause, seven-second outage recovery, EOF, region
+navigation, and captured Aporee API checks also pass.
+
+The header shows three battery bars using the platform's stock voltage
+thresholds and hysteresis. Empty is orange, an unread value shows `?`, and an
+active USB host shows `USB`. There is no charger-status signal; `USB` indicates
+host power, not confirmed charging. It does not invent a percentage. Cached
+headers redraw only when their displayed content or battery state changes.
+
 ## Build and validation
 
 0.1.1 removes the unused AAC decoder and its permanently reserved arena. The MP3
@@ -92,10 +123,10 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.2-alpha
+  python3 base/tools/build.py app --release 0.1.3-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
-app/build/host/aporee_host tests/aporee.host app/build/ui-check
+app/build/host/field_host tests/aporee.host app/build/ui-check
 cc -std=c99 -Wall -Wextra -Werror tests/aporee_net_test.c -o app/build/aporee_net_test
 app/build/aporee_net_test tmp-locations.json tmp-playlist.json
 ```
@@ -116,8 +147,9 @@ The region tests verify all 74,066 compressed ID slots against the uncompressed
 mapping, country and state filtering, one-location regions, worldwide-cache
 restoration, and menu navigation. The 0.1.2 region browser still needs device testing.
 
-The hardware build passes: image 575,280 bytes, RAM 130,496 / 131,072 bytes,
-pool 308,880 / 311,296 bytes (2,416 bytes spare, above the required 2,048).
+The 0.1.2 hardware build passed at image 575,280 bytes, RAM 130,496 / 131,072
+bytes and pool 308,880 / 311,296 bytes. See the 0.1.3 release verification below
+for the current image sizes.
 
 ## Files and provenance
 
@@ -133,3 +165,9 @@ pool 308,880 / 311,296 bytes (2,416 bytes spare, above the required 2,048).
 Upstream MPL-2.0 notices, third-party notices, and Apache-2.0 SDK attribution are
 retained. See `LICENSING.md`, `LICENSE` and `LICENSES/`. The installer reuses
 fm1-base's package checks, USB-MIDI transfer, stock restore and crash-report UI.
+
+## 0.1.3 release verification
+
+image 576672 B; RAM .data+.bss 130496 B of 131072; pool 308880 B of 311296. The hardware image, RAM, pool-headroom and register-access
+checks passed. The startup name and USB product are FIELD; package identity
+remains in the compatible FM-1_84 family (`FM-1_84000103`).

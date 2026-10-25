@@ -19,6 +19,7 @@
 #include "lwip/netif.h"
 #include "shim.h"
 #include "bearssl.h"
+#include "stream_crypto.h"
 
 extern int snprintf(char *buf, unsigned long sz, const char *f, ...);
 extern void *malloc(unsigned long n);
@@ -138,8 +139,8 @@ static int tls_open(conn_t *c, const char *host)
     br_ssl_engine_set_prf_sha256(e, &br_tls12_sha256_prf);
     br_ssl_engine_set_prf_sha384(e, &br_tls12_sha384_prf);
     br_ssl_engine_set_gcm(e, &br_sslrec_in_gcm_vtable, &br_sslrec_out_gcm_vtable);
-    br_ssl_engine_set_aes_ctr(e, &br_aes_small_ctr_vtable);
-    br_ssl_engine_set_ghash(e, &br_ghash_ctmul32);
+    br_ssl_engine_set_aes_ctr(e, &stream_aes_ctr);
+    br_ssl_engine_set_ghash(e, &stream_ghash);
     c->tls->x509.vtable = &NOV;
     br_ssl_engine_set_x509(e, &c->tls->x509.vtable);
     br_ssl_engine_set_buffer(e, c->buf, BR_SSL_BUFSIZE_MONO, 0);
@@ -432,6 +433,9 @@ static void radio_task(void *arg)
             break;
         }
         radio_wr += (uint32_t)got;
+        /* A file server can send the entire reserve in one burst. Give decoding
+         * and WiFi a turn even when recv() never needs to wait. */
+        os_time_dly(0);
     }
     conn_close(&sc);
     if (stop_req)

@@ -220,14 +220,34 @@ static void ui_row(int slot, uint32_t y, uint32_t h, const char *l, const char *
 }
 static void ui_title(int slot, const char *t, const char *hint)
 {
-    char key[UI_KEY];
-    snprintf(key, sizeof key, "T%s|%s", t, hint);
+    char key[UI_KEY], shown[40];
+    int battery = plat_battery();
+    int room = 190 - 16 - text_w(&FONT_B, t) - 12;
+    unsigned n;
+    w_cpy(shown, hint, sizeof shown);
+    n = (unsigned)strlen(shown);
+    while (n && text_w(&FONT_S, shown) > room)
+        shown[--n] = 0;
+    snprintf(key, sizeof key, "T%d%s|%s", battery, t, shown);
     if (w_eq(ui_key[slot], key))
         return;
     memcpy(ui_key[slot], key, sizeof key);
     cv_begin(240, 36, K_BG);
     cv_text(16, 10, &FONT_B, t, K_TEXT);
-    cv_text(224 - text_w(&FONT_S, hint), 10, &FONT_S, hint, K_DIM);
+    cv_text(190 - text_w(&FONT_S, shown), 10, &FONT_S, shown, K_DIM);
+    if (battery == 4) {
+        cv_text(202, 10, &FONT_XS, "USB", K_DIM);
+    } else {
+        unsigned bar;
+        uint16_t color = battery == 0 ? K_CORAL : K_TEAL;
+        cv_rect(203, 12, 22, 12, color);
+        cv_rect(225, 15, 3, 6, color);
+        cv_rect(204, 13, 20, 10, K_BG);
+        if (battery < 0)
+            cv_text(210, 10, &FONT_XS, "?", K_DIM);
+        else for (bar = 0; bar < (unsigned)battery && bar < 3u; bar++)
+            cv_rect(206 + bar * 6u, 15, 4, 6, color);
+    }
     cv_rect(16, 34, 208, 1, K_LINE);
     cv_blit(0, 0);
 }

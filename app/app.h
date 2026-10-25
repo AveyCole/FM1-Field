@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include "plat.h"
 
-#define APP_NAME "APOREE"
+#define APP_NAME "FIELD"
 #define APP_SPLASH_RGB RGB(48, 78, 56)
 #define APP_BLOCK 256u
 #define APP_CANVAS_PX (240u * 44u)       /* strips, including the 42-row password keyboard */

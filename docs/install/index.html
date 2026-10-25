@@ -8,7 +8,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Install · FM1 Field</title>
+<title>Install · FIELD</title>
 <style>
   /* light: the coral and the dim brown darkened just enough for 4.5:1 on the cream (and white on the coral) */
   :root { --bg: #faf4e8; --fg: #48392f; --dim: #6e5c4b; --accent: #b84a1e; --on-accent: #fff; --bad: #a3271b; --focus: #1f6fd1; }
@@ -59,7 +59,7 @@
 <body>
 <main>
   <button type="button" class="lang" id="lang" lang="ja">日本語</button>
-  <h1>Install FM1 Field</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Regions & colour update · 0.1.2-alpha</strong><br>Country and state browsing, a forest green / warm cream / muted orange palette, and the improved playback buffers. The original alpha was reported working on an FM-1; this update passes software tests and still needs device testing. First WiFi startup downloads the location index and may take three minutes or longer. Back up your existing firmware’s projects using its own backup tools first.</p>
+  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Playback scheduling & battery · 0.1.3-alpha</strong><br>HTTPS processing now yields regularly to the audio decoder, reducing a cause of cutouts despite buffered data. Includes a three-bar battery indicator (USB when host-powered), country/state browsing and the static globe. This update passes software tests and still needs device testing. First WiFi startup downloads the location index and may take three minutes or longer. Back up your existing firmware’s projects using its own backup tools first.</p>
   <p data-t="intro">Connect the FM-1 by USB, then press Install. It works in Chrome or Edge; the browser asks once to allow MIDI: allow it.</p>
   <p data-t="warn">Do not unplug the USB cable while writing.</p>
   <p class="small" data-t="direct"></p>
@@ -95,7 +95,7 @@
   <p id="reportstatus" role="status"></p>
   <label class="sr" for="report" data-t="reportlabel">Crash report</label>
   <textarea id="report" readonly hidden rows="14"></textarea>
-  <p><a href="../" data-t="manual">Back to FM1 Field</a></p>
+  <p><a href="../" data-t="manual">Back to FIELD</a></p>
 </main>
 <dialog id="confirm" aria-labelledby="confirmh">
   <form method="dialog">
@@ -110,9 +110,9 @@
   </form>
 </dialog>
 <footer>
-  <p class="small">FM1 Field is built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener">Hügelton Instruments<span class="sr" data-t="newtab"> (opens in a new tab)</span></a>. Derived from fm1-radio by Charles Vestal and fm1-base / felucca-bsp by Charles Vestal and Leo Kuroshita. Recordings by Radio Aporee contributors.<br>
+  <p class="small">FIELD is built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener">Hügelton Instruments<span class="sr" data-t="newtab"> (opens in a new tab)</span></a>. Derived from fm1-radio by Charles Vestal and fm1-base / felucca-bsp by Charles Vestal and Leo Kuroshita. Recordings by Radio Aporee contributors.<br>
     Fonts: Barlow Semi Condensed (SIL OFL 1.1). M-VAVE and FM-1 are trademarks of their respective owners.<br>
-    <span data-t="license"></span> <a href="https://github.com/AveyCole/FM1-Field" target="_blank" rel="noopener">FM1 Field source on GitHub<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
+    <span data-t="license"></span> <a href="https://github.com/AveyCole/FM1-Field" target="_blank" rel="noopener">FIELD source on GitHub<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
 </footer>
 <script type="module" src="../flasher.js"></script>
 </body>
