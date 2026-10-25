@@ -1,0 +1,21 @@
+# Simulated network metadata only: real API/decoder validation is separate.
+wait 3500
+expect ap_lat 525200
+shot aporee-berlin.png
+tap SEL
+wait 200
+shot aporee-credits.png
+tap SEL
+tap OCT+
+wait 2200
+expect ap_lat 356800
+shot aporee-tokyo.png
+tap GLO
+wait 200
+expect page 2
+shot aporee-wifi.png
+tap HOME
+tap PLAY
+wait 100
+expect ap_want 0
+shot aporee-stopped.png

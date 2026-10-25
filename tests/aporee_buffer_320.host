@@ -1,0 +1,6 @@
+# Same 1.5-second network pause, with a much higher 320 kbps recording.
+wait 18000
+expect ap_playing 1
+expect ap_refills 0
+expect ap_lat 525200
+expect ap_globe_draws <3

@@ -1,0 +1,6 @@
+# A 7-second outage exceeds the reserve: pause once, refill, resume the same file.
+wait 18000
+expect ap_playing 1
+expect ap_refills 1
+expect ap_lat 525200
+expect ap_globe_draws <3

@@ -1,0 +1,10 @@
+# Set APOREE_TEST_MP3 to a short local MP3, smaller than the 20 KB ring.
+# It is delivered entirely before the decoder runs: tests short-file EOF too.
+wav finite-playback.wav
+wait 8000
+expect ap_frames >10
+expect ap_completed >1
+tap PLAY
+wait 100
+expect ap_want 0
+wavstop

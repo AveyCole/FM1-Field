@@ -1,0 +1,9 @@
+app/build/
+build/
+build-venv/
+sdk/
+__pycache__/
+*.pyc
+tmp-*.json
+geography/states.geojson
+.DS_Store

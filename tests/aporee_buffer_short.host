@@ -1,0 +1,14 @@
+# 128 kbps MP3, 48 KB/s simulated network; pause that network for 1.5 seconds.
+wait 3500
+expect ap_ring 81920
+expect ap_pcm 6912
+expect ap_playing 1
+expect ap_globe_draws <3
+wait 10000
+expect ap_playing 1
+expect ap_refills 0
+expect ap_globe_draws <3
+tap GLO
+tap HOME
+wait 200
+expect ap_globe_draws <4
