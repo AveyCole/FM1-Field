@@ -1,0 +1,66 @@
+wait 6000
+tap ARP
+tap REC
+wait 3000
+expect sam_state 2
+expect sam_len 21824
+turn K1 4
+turn K3 5
+tap SEL
+tap SEL
+expect sam_loop 2
+tap EDIT
+expect sam_layer 1
+tap REC
+expect sam_state 1
+expect sam_dubbing 1
+expect sam_len 21824
+wait 1000
+expect sam_dub_pos >7000
+expect sam_dub_pos <10000
+peakreset
+wait 200
+expect peak_db_min -65
+shot field-layer-capture.png
+tap EDIT
+expect sam_layer 1
+tap REC
+expect sam_state 2
+expect sam_dubbing 0
+expect sam_len 21824
+expect sam_pitch 5
+expect sam_loop 2
+shot field-layer-ready.png
+tap SAVE
+reboot
+wait 6000
+tap HOME
+tap ARP
+expect sam_state 2
+expect sam_len 21824
+expect sam_pitch 5
+expect sam_loop 2
+expect sam_layer 0
+tap EDIT
+tap REC
+wait 3000
+expect sam_state 2
+expect sam_dubbing 0
+expect sam_len 21824
+press FX
+wait 500
+release FX
+expect page 11
+expect space_active 1
+expect sam_state 2
+tap ARP
+expect sam_layer 1
+tap EDIT
+expect sam_layer 0
+tap REC
+wait 1000
+tap REC
+expect sam_state 2
+expect sam_dubbing 0
+expect sam_len >7000
+expect sam_len <10000

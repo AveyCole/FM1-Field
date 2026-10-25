@@ -489,13 +489,13 @@ static void ui_sampler(void)
     static const char *const labels[4]={"K1 START","K2 END","K3 PITCH","K4 LEVEL"};
     char a[20],b[20],c[20],d[20],status[40],mode[16];
     snprintf(mode,sizeof mode,"Slice / %u",(unsigned)sam_slices);
-    ui_title(0,"Sampler",sam_loop==3?mode:sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
-    if(sam_state==SAM_CAPTURE) snprintf(status,sizeof status,"Capturing %u%%",(unsigned)(sam_len*100u/SAM_FRAMES));
+    ui_title(0,sam_layer?"Sampler / Layer":"Sampler",sam_loop==3?mode:sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
+    if(sam_state==SAM_CAPTURE) snprintf(status,sizeof status,"%s %u%%",sam_dubbing?"Layering":"Capturing",(unsigned)(sam_dubbing?sam_dub_pos*100u/sam_len:sam_len*100u/SAM_FRAMES));
     else if(ui_msg[0]) w_cpy(status,ui_msg,sizeof status);
     else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/SAM_RATE));
     else w_cpy(status,ui_msg[0]?ui_msg:"REC captures / 2.7s mono",sizeof status);
     ui_row(1,40,28,status,"",sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
-    ui_row(4,68,20,"ALGO",sam_muted?"LIVE MUTED":"LIVE ON",K_DIM,sam_muted?K_CORAL:K_TEAL,K_BG);
+    ui_row(4,68,20,sam_layer?"EDIT / LAYER":"EDIT / REPLACE",sam_muted?"LIVE MUTED":"LIVE ON",K_DIM,sam_muted?K_CORAL:K_TEAL,K_BG);
     snprintf(a,sizeof a,"%u%%",(unsigned)(sam_start*100u/127u));
     snprintf(b,sizeof b,"%u%%",(unsigned)(sam_end*100u/127u));
     snprintf(c,sizeof c,"%+d st",sam_pitch+12*sam_oct);
@@ -891,6 +891,7 @@ static void input(void)
         }
     } else if (ui_page == PG_SYNTH) {
         int x;
+        if((down&(1u<<B_EDIT)) && sam_state!=SAM_CAPTURE) sam_layer=!sam_layer;
         if(presets && sam_loop==3) {
             static const uint8_t counts[]={4,8,16,27};int i=0;
             while(i<3 && counts[i]!=sam_slices) i++;
@@ -980,6 +981,9 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"fx_len")) *got=(int)fx.len;
     else if (!strcmp(what,"screen_on")) *got=screen!=0;
     else if (!strcmp(what,"sam_muted")) *got=sam_muted;
+    else if (!strcmp(what,"sam_layer")) *got=sam_layer;
+    else if (!strcmp(what,"sam_dubbing")) *got=sam_dubbing;
+    else if (!strcmp(what,"sam_dub_pos")) *got=(int)sam_dub_pos;
     else if (!strcmp(what,"sam_slices")) *got=sam_slices;
     else if (!strcmp(what,"fil_on")) *got=fil_seen && fil_on;
     else if (!strcmp(what,"fil_type")) *got=fil_type;

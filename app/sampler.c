@@ -9,6 +9,9 @@ enum {SAM_EMPTY,SAM_CAPTURE,SAM_READY};
 static uint8_t *sam_data;
 static volatile uint8_t sam_active,sam_state,sam_voice,sam_gate;
 static volatile uint8_t sam_muted;
+static uint8_t sam_layer,sam_dubbing,sam_dub_fresh,sam_dub_block[SAM_BLOCK];
+static uint32_t sam_dub_pos;
+static float sam_dub_old,sam_dub_monitor;
 static float sam_monitor_level=1;
 static volatile uint32_t sam_len;
 static uint8_t sam_start,sam_end=127,sam_level=110,sam_loop,sam_div,sam_slice;
@@ -65,6 +68,7 @@ static void sam_init(void *buffer)
 {
  sam_data=buffer;sam_state=SAM_EMPTY;sam_len=0;sam_voice=sam_gate=0;sam_active=0;
  sam_muted=0;sam_monitor_level=1;sam_slices=27;
+ sam_layer=sam_dubbing=0;sam_dub_pos=0;sam_dub_old=sam_dub_monitor=0;
 }
 static void sam_monitor(float *l,float *r)
 {
@@ -74,9 +78,31 @@ static void sam_monitor(float *l,float *r)
  *l*=sam_monitor_level;*r*=sam_monitor_level;
 }
 static void sam_enter(void) {sam_active=1;}
+/* The old ADPCM block stays intact until the replacement block is complete.
+ * Playback is stopped during this pass, so its decode cache can hold the old
+ * block. Only 36 extra bytes are needed, never a second sample bank. */
+static void sam_dub_put(unsigned at,int value)
+{
+ unsigned code;
+ if(!at) {sam_dub_block[0]=(uint8_t)sam_pred;sam_dub_block[1]=(uint8_t)((unsigned)sam_pred>>8);sam_dub_block[2]=(uint8_t)sam_index;sam_dub_block[3]=0;}
+ code=sam_encode(value);
+ if(at&1u) sam_dub_block[4+at/2]|=(uint8_t)(code<<4);
+ else sam_dub_block[4+at/2]=(uint8_t)code;
+}
+static void sam_dub_flush(void)
+{
+ unsigned used=sam_dub_pos%64u,i,block=(sam_dub_pos-1u)/64u;
+ if(used) for(i=used;i<64;i++) sam_dub_put(i,sam_cache[i]);
+ memcpy(sam_data+block*SAM_BLOCK,sam_dub_block,SAM_BLOCK);sam_cached=0xFFFFFFFFu;
+}
 static void sam_finish(void)
 {
- if(sam_state==SAM_CAPTURE) sam_state=sam_len>=64?SAM_READY:SAM_EMPTY;
+ if(sam_state==SAM_CAPTURE) {
+  sam_state=SAM_EMPTY;
+  /* An early stop discards the unfinished 8 ms block, preserving the old
+   * tail byte-for-byte rather than re-encoding audio that was not recorded. */
+  sam_dubbing=0;sam_state=sam_len>=64?SAM_READY:SAM_EMPTY;
+ }
 }
 static void sam_exit(void)
 {
@@ -87,9 +113,12 @@ static void sam_exit(void)
 static void sam_record(void)
 {
  sam_voice=sam_gate=0;sam_env=0;
- if(sam_state==SAM_CAPTURE) {sam_state=sam_len>=64?SAM_READY:SAM_EMPTY;return;}
- sam_state=SAM_EMPTY;sam_len=0;sam_div=0;sam_sum=0;sam_tick=0;sam_pred=sam_index=0;
- sam_start=0;sam_end=127;sam_cached=0xFFFFFFFFu;
+ if(sam_state==SAM_CAPTURE) {sam_finish();return;}
+ sam_dubbing=sam_layer && sam_state==SAM_READY && sam_len>=64;
+ sam_state=SAM_EMPTY;sam_div=0;sam_sum=0;sam_tick=0;sam_pred=sam_index=0;
+ sam_dub_pos=0;sam_dub_old=sam_dub_monitor=0;sam_dub_fresh=0;
+ if(!sam_dubbing) {sam_len=0;sam_start=0;sam_end=127;}
+ sam_cached=0xFFFFFFFFu;
  sam_state=SAM_CAPTURE;
 }
 /* Buffering does not advance capture. Average 5/6 real decoded frames per
@@ -97,11 +126,21 @@ static void sam_record(void)
 static void sam_capture(float l,float r,int fresh)
 {
  unsigned pos,at,code;uint8_t *b;
- if(sam_state!=SAM_CAPTURE || !fresh) return;
+ if(sam_state!=SAM_CAPTURE) return;
+ sam_dub_fresh=(uint8_t)fresh;
+ if(!fresh) return;
  sam_sum+=(l+r)*0.5f;sam_div++;sam_tick+=SAM_RATE;
  if(sam_tick<44100u) return;
  sam_tick-=44100u;
- pos=(unsigned)sam_len;at=pos%64u;b=sam_data+(pos/64u)*SAM_BLOCK;
+ pos=sam_dubbing?sam_dub_pos:(unsigned)sam_len;at=pos%64u;b=sam_data+(pos/64u)*SAM_BLOCK;
+ if(sam_dubbing) {
+  int old=sam_sample(pos),value=(int)(sam_sum*(32767.0f/(float)sam_div));
+  sam_sum=0;sam_div=0;sam_dub_old=(float)old/32768.0f;
+  sam_dub_put(at,(old+value)/2);sam_dub_pos=pos+1u;
+  if(at==63u || sam_dub_pos==sam_len) sam_dub_flush();
+  if(sam_dub_pos==sam_len) {sam_dubbing=0;sam_state=SAM_READY;}
+  return;
+ }
  if(!at) {b[0]=(uint8_t)sam_pred;b[1]=(uint8_t)((unsigned)sam_pred>>8);b[2]=(uint8_t)sam_index;b[3]=0;}
  code=sam_encode((int)(sam_sum*(32767.0f/(float)sam_div)));sam_sum=0;sam_div=0;
  if(at&1u) b[4+at/2]|=(uint8_t)(code<<4);
@@ -137,6 +176,11 @@ static void sam_note(int note)
 static float sam_next(void)
 {
  unsigned first,last,i,j;float t,v,edge;
+ if(sam_state==SAM_CAPTURE && sam_dubbing) {
+  sam_dub_monitor+=0.25f*((sam_dub_fresh?sam_dub_old:0)-sam_dub_monitor);
+  edge=fm_minf(1.0f,fm_minf((float)sam_dub_pos,(float)(sam_len-sam_dub_pos))/24.0f);
+  return sam_dub_monitor*edge*(float)sam_level/127.0f;
+ }
  if(!sam_voice || sam_state!=SAM_READY) return 0;
  first=sam_first();last=sam_last();
  if(first+2u>last) {sam_voice=0;return 0;}

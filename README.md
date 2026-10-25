@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.14-alpha](docs/firmware/field-0.1.14-alpha.fwsc)**
+[Download 0.1.15-alpha](docs/firmware/field-0.1.15-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.14 update adds separate Delay/Reverb controls, straight/dotted/triplet divisions and a live FX send toggle while keeping sampler playback processed. Audio, routing, navigation and screen checks pass; physical-device testing is still needed.
+The 0.1.15 update adds one-pass sample overdub. EDIT in ARP selects LAYER / REPLACE; REC layers the new live source with the previous clip at equal levels, and SAVE stores the merged result. Audio, save/restore and navigation checks pass; physical-device testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -42,7 +42,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | FX | Short tap sets tempo; hold 450 ms on HOME, the regional player or ARP to open Delay/Reverb |
 | PRESETS on either FX page | Set the shared BPM, 40–240; header displays it |
 | ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
-| EDIT | Toggle Near on the player; fixed 50 km neighborhood with a visible Near indicator |
+| EDIT | Player: toggle Near. ARP: switch REPLACE / LAYER recording while stopped |
 
 In favorites, turn SELECT to move, then press SEL or PLAY to replay that exact recording.
 Favorites survive power-off. Up to 16 fit in a separate 3,840-byte flash object; long
@@ -73,6 +73,21 @@ Sampler playback and Echo + Room now work together in separate memory. The ENV h
 Saving briefly interrupts audio while the flash is programmed. Failed writes
 retain the previous saved version. Normal FIELD updates preserve the slot;
 restoring other firmware or erasing user data can overwrite it.
+
+Press **EDIT in ARP** to select **LAYER**, then **REC** to overdub the live
+recording onto the existing clip. It makes one pass over the full original
+clip at its original speed, with a 50/50 blend for headroom. The old clip is
+audible during the pass; keyboard audition resumes afterward. Trim, pitch,
+octave, slice and playback settings are retained. The clip's length stays the
+same, up to the current 2.728-second capacity. Network buffering pauses capture.
+
+REC again stops early and leaves the remaining old audio intact. SAVE stops
+capture and stores the merged result in the existing single saved slot.
+**EDIT** switches back to **REPLACE** for a new recording; it defaults to Replace
+after reboot. If no clip exists, Layer makes a normal first capture. A layer
+is temporary until saved. FX remain available and are not baked into capture.
+
+![FIELD sample layering](docs/images/field-layer.png)
 
 The sampler uses a static landscape with four compact knob readouts and no
 keyboard activity display. Tap FX on any page to set tempo. ENV shows the BPM
@@ -172,10 +187,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.14-alpha
+  python3 base/tools/build.py app --release 0.1.15-alpha
 ```
 
-This produces `app/build/field-0.1.14-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.15-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

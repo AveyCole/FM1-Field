@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.14-alpha
+# FIELD — experimental 0.1.15-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.14-alpha
+  python3 base/tools/build.py app --release 0.1.15-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -626,3 +626,32 @@ corners and memory guards. Host tests cover page switching, retained knobs,
 live routing toggle, sampler latch preservation, BPM/free/sync controls and
 navigation. Existing sampler, saved clip, filter and pixel-mirror tests pass.
 Hardware checks: image 578496 B; RAM .data+.bss 130784 B of 131072; pool 308884 B of 311296. Physical-device audio testing is still needed.
+
+
+## One-pass sample overdub (0.1.15)
+
+EDIT in ARP switches REPLACE / LAYER while capture is stopped. LAYER + REC
+blends the new raw live source with the old clip at equal weights over one
+full original-length pass. The old clip is monitored at its original speed
+while keyboard playback is stopped; trim/pitch/octave/loop/slice settings are
+retained for subsequent playback. Capture precedes live-monitor mute, sampler
+mix and FX. Network buffering pauses it. An empty slot falls back to normal
+capture. Duration remains up to 2.728 seconds; lower-rate recording is deferred.
+
+The existing playback decode cache holds an old 64-frame ADPCM block while
+36 scratch bytes accumulate its blended replacement. Only a complete block
+is committed in place, except the final partial clip block which is padded
+outside the valid duration. An early stop discards the unfinished block (less
+than 8 ms) and preserves the old tail byte-for-byte. No second clip bank or
+new heap allocation is needed. SAVE finishes capture and uses the unchanged
+single-slot atomic save format for the merged clip. Layer selection defaults
+off after reboot; the saved audio retains its layers.
+
+Two-tone DSP checks measure 32.2 dB blend SNR and cover audible old-clip
+monitoring, no-progress/no-write stalls, retained length/settings, early stop,
+untouched tails, exit before a block commits, non-aligned short clips, guard
+bytes and replace/empty fallback. Host checks cover the EDIT selection and
+capture lockout, progress, stop, save/reboot, another complete layer, FX
+navigation and returning to Replace. Existing sample, save, filter, delay,
+reverb and pixel-mirror checks pass. Screens were visually inspected.
+Hardware checks: image 579152 B; RAM .data+.bss 130816 B of 131072; pool 308884 B of 311296. Physical-device testing is still needed.
