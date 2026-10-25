@@ -53,5 +53,17 @@ int main(void)
  clip_header_t *h=(void *)flash;h->seq=0xFFFFFFFEu;h->hcrc=clip_crc(h,sizeof *h-4u);
  make_clip(.1f,4000);assert(!sam_save());assert(clip_current()->seq==0xFFFFFFFFu);
  make_clip(.2f,6000);assert(!sam_save());assert(clip_current()->seq==0 && clip_current()->len==6000);
+ /* Zero in the former reserved byte retains legacy 8 kHz clip behavior. */
+ memcpy(flash,snapshot,sizeof flash);sam_init(clip);assert(sam_restore() && sam_rate()==8000);
+ for(unsigned q=1;q<3;q++) {
+  sam_init(clip);sam_quality=(uint8_t)q;sam_record();
+  while(sam_len<10000) sam_capture(.25f,.25f,1);
+  sam_finish();sam_quality=0; /* save the clip's actual rate, not a next-capture choice */
+  expected=clip_crc(clip,clip_bytes(sam_len));assert(!sam_save());
+  sam_init(clip);assert(sam_restore() && sam_rate()==(8000u>>q) && sam_quality==q && sam_len==10000);
+  assert(clip_crc(clip,clip_bytes(sam_len))==expected);
+ }
+ h=(clip_header_t *)clip_current();h->rate_shift=3;h->hcrc=clip_crc(h,sizeof *h-4u);
+ sam_init(clip);assert(sam_restore() && sam_rate()==4000); /* invalid newest rate falls back */
  puts("sample slot: exact audio/settings restore, replacement, bounded banks, erase/payload/commit cuts, corrupt fallback and sequence wrap pass");
 }

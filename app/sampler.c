@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-/* One 2.728 s, 8 kHz mono IMA ADPCM clip in the former 12 KiB FX buffer.
+/* One 8/4/2 kHz mono IMA ADPCM clip in the former 12 KiB FX buffer.
  * Independent 64-sample blocks support pitched playback with a tiny cache. */
 #define SAM_BYTES 12288u
 #define SAM_BLOCK 36u
@@ -9,6 +9,8 @@ enum {SAM_EMPTY,SAM_CAPTURE,SAM_READY};
 static uint8_t *sam_data;
 static volatile uint8_t sam_active,sam_state,sam_voice,sam_gate;
 static volatile uint8_t sam_muted;
+static uint8_t sam_quality,sam_rate_shift;
+static unsigned sam_rate(void) {return SAM_RATE>>sam_rate_shift;}
 static uint8_t sam_layer,sam_dubbing,sam_dub_fresh,sam_dub_block[SAM_BLOCK];
 static uint32_t sam_dub_pos;
 static float sam_dub_old,sam_dub_monitor;
@@ -20,7 +22,8 @@ static int8_t sam_pitch,sam_oct;
 static int sam_pred,sam_index;
 static uint32_t sam_tick,sam_cached=0xFFFFFFFFu;
 static int16_t sam_cache[64];
-static float sam_sum,sam_pos,sam_step,sam_env;
+static uint32_t sam_position;
+static float sam_sum,sam_fraction,sam_step,sam_env;
 static const int16_t sam_steps[89]={
  7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,80,
  88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,494,
@@ -69,6 +72,7 @@ static void sam_init(void *buffer)
  sam_data=buffer;sam_state=SAM_EMPTY;sam_len=0;sam_voice=sam_gate=0;sam_active=0;
  sam_muted=0;sam_monitor_level=1;sam_slices=27;
  sam_layer=sam_dubbing=0;sam_dub_pos=0;sam_dub_old=sam_dub_monitor=0;
+ sam_quality=sam_rate_shift=0;
 }
 static void sam_monitor(float *l,float *r)
 {
@@ -117,7 +121,7 @@ static void sam_record(void)
  sam_dubbing=sam_layer && sam_state==SAM_READY && sam_len>=64;
  sam_state=SAM_EMPTY;sam_div=0;sam_sum=0;sam_tick=0;sam_pred=sam_index=0;
  sam_dub_pos=0;sam_dub_old=sam_dub_monitor=0;sam_dub_fresh=0;
- if(!sam_dubbing) {sam_len=0;sam_start=0;sam_end=127;}
+ if(!sam_dubbing) {sam_len=0;sam_start=0;sam_end=127;sam_rate_shift=sam_quality;}
  sam_cached=0xFFFFFFFFu;
  sam_state=SAM_CAPTURE;
 }
@@ -129,7 +133,7 @@ static void sam_capture(float l,float r,int fresh)
  if(sam_state!=SAM_CAPTURE) return;
  sam_dub_fresh=(uint8_t)fresh;
  if(!fresh) return;
- sam_sum+=(l+r)*0.5f;sam_div++;sam_tick+=SAM_RATE;
+ sam_sum+=(l+r)*0.5f;sam_div++;sam_tick+=sam_rate();
  if(sam_tick<44100u) return;
  sam_tick-=44100u;
  pos=sam_dubbing?sam_dub_pos:(unsigned)sam_len;at=pos%64u;b=sam_data+(pos/64u)*SAM_BLOCK;
@@ -169,8 +173,8 @@ static void sam_note(int note)
 {
  if(sam_loop==3) sam_slice=(uint8_t)(note<53?0:note>79?26:note-53)%sam_slices;
  if(sam_state!=SAM_READY || sam_len<64 || sam_first()+2u>sam_last()) return;
- sam_voice=0;sam_pos=(float)sam_first();sam_env=0;
- sam_step=((float)SAM_RATE/44100.0f)*fm_exp2f((float)((sam_loop==3?0:note-60)+sam_pitch+12*sam_oct)/12.0f);
+ sam_voice=0;sam_position=sam_first();sam_fraction=0;sam_env=0;
+ sam_step=((float)sam_rate()/44100.0f)*fm_exp2f((float)((sam_loop==3?0:note-60)+sam_pitch+12*sam_oct)/12.0f);
  sam_gate=1;sam_voice=1;
 }
 static float sam_next(void)
@@ -184,17 +188,17 @@ static float sam_next(void)
  if(!sam_voice || sam_state!=SAM_READY) return 0;
  first=sam_first();last=sam_last();
  if(first+2u>last) {sam_voice=0;return 0;}
- if(sam_pos<(float)first) sam_pos=(float)first;
- if(sam_pos>=(float)last) {
-  if((sam_loop==1 || sam_loop==2) && sam_gate) sam_pos=(float)first;
+ if(sam_position<first) {sam_position=first;sam_fraction=0;}
+ if(sam_position>=last) {
+  if((sam_loop==1 || sam_loop==2) && sam_gate) {sam_position=first;sam_fraction=0;}
   else {sam_voice=0;return 0;}
  }
- i=(unsigned)sam_pos;j=i+1u<last?i+1u:i;t=sam_pos-(float)i;
+ i=sam_position;j=i+1u<last?i+1u:i;t=sam_fraction;
  v=(float)sam_sample(i);v+=(sam_sample(j)-v)*t;
  sam_env+=(sam_gate?1.0f:-1.0f)/220.0f;
  if(sam_env>1) sam_env=1;
  if(sam_env<=0) {sam_env=0;sam_voice=0;return 0;}
- edge=fm_minf(1.0f,fm_minf(sam_pos-(float)first,(float)last-1.0f-sam_pos)/24.0f);
- sam_pos+=sam_step;
+ edge=fm_minf(1.0f,fm_minf((float)(i-first)+t,(float)(last-1u-i)-t)/24.0f);
+ sam_fraction+=sam_step;i=(unsigned)sam_fraction;sam_position+=i;sam_fraction-=(float)i;
  return v*(1.0f/32768.0f)*sam_env*fm_maxf(edge,0)*(float)sam_level/127.0f;
 }

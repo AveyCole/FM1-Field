@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.15-alpha](docs/firmware/field-0.1.15-alpha.fwsc)**
+[Download 0.1.16-alpha](docs/firmware/field-0.1.16-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.15 update adds one-pass sample overdub. EDIT in ARP selects LAYER / REPLACE; REC layers the new live source with the previous clip at equal levels, and SAVE stores the merged result. Audio, save/restore and navigation checks pass; physical-device testing is still needed.
+The 0.1.16 update adds knob-selectable Lo-fi sampling: 2.728 seconds at 8 kHz, 5.456 seconds at 4 kHz or 10.912 seconds at 2 kHz, using the same memory. Saved clips retain their rate and overdubs stay aligned. Software checks pass; physical-device testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -36,6 +36,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | MASTER | Volume |
 | Keys | Play the captured sample on the player and in ARP; hold white keys for FX in ENV |
 | ARP | Sample editor: REC capture, PLAY audition, SEL cycles one shot / loop hold / loop latch / slice; K1 start, K2 end, K3 pitch, K4 level |
+| PRESETS in ARP, outside Slice | Choose the next capture rate: 8 / 4 / 2 kHz, up to 2.7 / 5.5 / 10.9 seconds |
 | PRESETS in ARP Slice | Select 4, 8, 16 or 27 equal slices of the trimmed clip; fewer slices are longer |
 | LFO | Open the filter page; press again or HOME to return to the player |
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
@@ -49,7 +50,7 @@ Favorites survive power-off. Up to 16 fit in a separate 3,840-byte flash object;
 URLs and credits can fill it sooner. A full list asks you to remove an entry.
 These are online bookmarks: playback still requires WiFi and the recording to remain available.
 
-The sampler holds one **2.728-second, 8 kHz mono ADPCM clip** (one playback voice).
+The sampler holds one **mono ADPCM clip** (one playback voice) in the same 12 KiB bank.
 It survives returning to the main screen, changing recordings, and reopening ARP.
 REC again stops capture early; otherwise it stops at capacity. ARP's OCT buttons
 transpose; keys use C4 as the original pitch. In Loop hold, releasing the triggering key stops playback. Loop latch keeps
@@ -65,7 +66,7 @@ stop capture. A short fade avoids an abrupt gain change. Leaving ARP for Echo + 
 the live recording; the editor remembers its switch until reboot.
 
 Press **SAVE in ARP** to store one clip, including trim, pitch/octave, level,
-playback mode and slice count. SAVE during capture finishes it early and saves.
+playback mode, slice count and recorded rate. SAVE during capture finishes it early and saves.
 The display confirms “Sample saved.” Another SAVE replaces this single slot.
 New captures and edits are temporary until saved. The saved clip restores at
 boot and when ARP is reopened with no clip after ENV reuses its RAM for FX.
@@ -74,12 +75,35 @@ Saving briefly interrupts audio while the flash is programmed. Failed writes
 retain the previous saved version. Normal FIELD updates preserve the slot;
 restoring other firmware or erasing user data can overwrite it.
 
+Turn **PRESETS in ARP outside Slice mode**, before recording in REPLACE,
+to select quality/time. Turn right for more Lo-fi; left returns to 8 kHz.
+
+| Recording rate | Capacity | Sound |
+| --- | --- | --- |
+| 8 kHz | 2.728 seconds | Original setting |
+| Lo-fi 4 kHz | 5.456 seconds | Less high-frequency detail |
+| Lo-fi 2 kHz | 10.912 seconds | Strong Lo-fi character |
+
+The right side of the status row shows the selected rate/capacity; Ready shows
+the current clip's actual length. Changing PRESETS does not stretch or retune
+an existing sample: the setting applies to the next new capture. It cannot
+change during recording. Slice mode retains PRESETS for slice count; press
+SEL to leave Slice before selecting recording quality.
+
+Overdubs use the existing clip's rate and duration. In LAYER with a clip,
+PRESETS reports “Layer uses clip rate”; use REPLACE to choose a new rate.
+SAVE stores the actual captured rate, and it restores on reboot at normal
+pitch. Existing 8 kHz saved clips remain compatible. Lo-fi clips need FIELD
+0.1.16 or later for rate-aware playback; older builds assume 8 kHz.
+
+![FIELD Lo-fi sampling](docs/images/field-lofi.png)
+
 Press **EDIT in ARP** to select **LAYER**, then **REC** to overdub the live
 recording onto the existing clip. It makes one pass over the full original
 clip at its original speed, with a 50/50 blend for headroom. The old clip is
 audible during the pass; keyboard audition resumes afterward. Trim, pitch,
 octave, slice and playback settings are retained. The clip's length stays the
-same, up to the current 2.728-second capacity. Network buffering pauses capture.
+same at its recorded rate. Network buffering pauses capture.
 
 REC again stops early and leaves the remaining old audio intact. SAVE stops
 capture and stores the merged result in the existing single saved slot.
@@ -187,10 +211,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.15-alpha
+  python3 base/tools/build.py app --release 0.1.16-alpha
 ```
 
-This produces `app/build/field-0.1.15-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.16-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

@@ -1,0 +1,77 @@
+wait 6000
+tap ARP
+turn PRESET 1
+expect sam_quality 1
+tap REC
+expect sam_rate 4000
+wait 3000
+expect sam_state 1
+expect sam_len >11000
+expect sam_len <13000
+wait 3000
+expect sam_state 2
+expect sam_len 21824
+shot field-lofi-4k.png
+tap SAVE
+reboot
+wait 6000
+tap HOME
+tap ARP
+expect sam_quality 1
+expect sam_rate 4000
+expect sam_len 21824
+tap EDIT
+turn PRESET 1
+expect sam_quality 1
+tap REC
+expect sam_dubbing 1
+expect sam_rate 4000
+wait 1000
+expect sam_dub_pos >3500
+expect sam_dub_pos <4500
+tap REC
+tap EDIT
+turn PRESET 1
+expect sam_quality 2
+expect sam_rate 4000
+tap REC
+expect sam_rate 2000
+wait 6000
+expect sam_state 1
+expect sam_len >11000
+expect sam_len <13000
+shot field-lofi-capture.png
+turn PRESET -2
+expect sam_quality 2
+expect sam_rate 2000
+wait 5200
+expect sam_state 2
+expect sam_len 21824
+shot field-lofi-2k.png
+tap SEL
+tap SEL
+tap SEL
+turn PRESET -1
+expect sam_slices 16
+expect sam_quality 2
+tap SAVE
+reboot
+wait 6000
+tap HOME
+tap ARP
+expect sam_rate 2000
+expect sam_quality 2
+expect sam_slices 16
+key 7 down
+wait 200
+expect sam_voice 1
+key 7 up
+tap SEL
+spin PRESET -30
+expect sam_quality 0
+expect sam_rate 2000
+tap REC
+expect sam_rate 8000
+wait 3000
+expect sam_state 2
+expect sam_len 21824

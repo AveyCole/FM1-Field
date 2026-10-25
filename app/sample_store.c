@@ -9,7 +9,7 @@ typedef struct {
  uint32_t magic,seq,len,crc;
  uint8_t start,end,level,loop,slices;
  int8_t pitch,oct;
- uint8_t reserved;
+ uint8_t rate_shift; /* old clips stored zero here: 8 kHz */
  uint32_t hcrc;
 } clip_header_t;
 static uint32_t clip_crc(const void *data,unsigned n)
@@ -25,7 +25,7 @@ static const clip_header_t *clip_valid(unsigned bank)
  if(!p || h->magic!=CLIP_MAGIC || h->len<64 || h->len>SAM_FRAMES ||
     h->start>125 || h->end<=h->start || h->end>127 || h->level>127 || h->loop>3 ||
     (h->slices!=4 && h->slices!=8 && h->slices!=16 && h->slices!=27) ||
-    h->pitch < -24 || h->pitch>24 || h->oct < -2 || h->oct>2 ||
+    h->pitch < -24 || h->pitch>24 || h->oct < -2 || h->oct>2 || h->rate_shift>2 ||
     h->hcrc!=clip_crc(h,sizeof *h-4u) || h->crc!=clip_crc(p+64,clip_bytes(h->len))) return 0;
  for(i=0;i<clip_bytes(h->len);i+=SAM_BLOCK) if(p[64+i+2]>88) return 0;
  return h;
@@ -43,6 +43,7 @@ static int sam_restore(void)
  memcpy(sam_data,(const uint8_t *)h+64,clip_bytes(h->len));
  sam_start=h->start;sam_end=h->end;sam_level=h->level;sam_loop=h->loop;sam_slices=h->slices;
  sam_pitch=h->pitch;sam_oct=h->oct;sam_slice=0;sam_cached=0xFFFFFFFFu;
+ sam_quality=sam_rate_shift=h->rate_shift;
  sam_len=h->len;sam_state=SAM_READY;return 1;
 }
 static int sam_save(void)
@@ -52,6 +53,7 @@ static int sam_save(void)
  old=clip_current();bank=old==(const void *)plat_data(CLIP_BASE)?1u:0u;off=CLIP_BASE+bank*CLIP_BANK;
  memset(&h,0,sizeof h);h.magic=CLIP_MAGIC;h.seq=old?old->seq+1u:1u;h.len=sam_len;n=clip_bytes(h.len);
  h.start=sam_start;h.end=sam_end;h.level=sam_level;h.loop=sam_loop;h.slices=sam_slices;h.pitch=sam_pitch;h.oct=sam_oct;
+ h.rate_shift=sam_rate_shift;
  h.crc=clip_crc(sam_data,n);h.hcrc=clip_crc(&h,sizeof h-4u);
  for(i=0;i<CLIP_BANK;i+=4096u) if(plat_data_erase(off+i)) return -1;
  if(plat_data_write(off+64,sam_data,n) || memcmp(plat_data(off)+64,sam_data,n) ||

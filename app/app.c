@@ -487,14 +487,15 @@ static int sam_knob(volatile uint8_t *v,int32_t d)
 static void ui_sampler(void)
 {
     static const char *const labels[4]={"K1 START","K2 END","K3 PITCH","K4 LEVEL"};
+    static const char *const quality[]={"8k / 2.7s","LO 4k / 5.5s","LO 2k / 10.9s"};
     char a[20],b[20],c[20],d[20],status[40],mode[16];
     snprintf(mode,sizeof mode,"Slice / %u",(unsigned)sam_slices);
     ui_title(0,sam_layer?"Sampler / Layer":"Sampler",sam_loop==3?mode:sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
     if(sam_state==SAM_CAPTURE) snprintf(status,sizeof status,"%s %u%%",sam_dubbing?"Layering":"Capturing",(unsigned)(sam_dubbing?sam_dub_pos*100u/sam_len:sam_len*100u/SAM_FRAMES));
     else if(ui_msg[0]) w_cpy(status,ui_msg,sizeof status);
-    else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/SAM_RATE));
-    else w_cpy(status,ui_msg[0]?ui_msg:"REC captures / 2.7s mono",sizeof status);
-    ui_row(1,40,28,status,"",sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
+    else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/sam_rate()));
+    else w_cpy(status,"REC captures",sizeof status);
+    ui_row(1,40,28,status,quality[sam_state==SAM_CAPTURE || (sam_layer && sam_len>=64)?sam_rate_shift:sam_quality],sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
     ui_row(4,68,20,sam_layer?"EDIT / LAYER":"EDIT / REPLACE",sam_muted?"LIVE MUTED":"LIVE ON",K_DIM,sam_muted?K_CORAL:K_TEAL,K_BG);
     snprintf(a,sizeof a,"%u%%",(unsigned)(sam_start*100u/127u));
     snprintf(b,sizeof b,"%u%%",(unsigned)(sam_end*100u/127u));
@@ -502,7 +503,7 @@ static void ui_sampler(void)
     snprintf(d,sizeof d,"%u%%",(unsigned)(sam_level*100u/127u));
     ui_landscape(0);
     ui_knobs(labels,a,b,c,d);
-    ui_row(13,214,26,sam_loop==3?"PRESETS slices":"REC capture  SEL mode","SAVE clip",K_DIM,K_DIM,K_PANEL);
+    ui_row(13,214,26,sam_loop==3?"PRESETS slices":"PRESETS Lo-fi","SAVE clip",K_DIM,K_DIM,K_PANEL);
 }
 
 static void ui_filter(void)
@@ -892,6 +893,10 @@ static void input(void)
     } else if (ui_page == PG_SYNTH) {
         int x;
         if((down&(1u<<B_EDIT)) && sam_state!=SAM_CAPTURE) sam_layer=!sam_layer;
+        if(presets && sam_loop!=3 && sam_state!=SAM_CAPTURE) {
+            if(sam_layer && sam_len>=64) w_cpy(ui_msg,"Layer uses clip rate",sizeof ui_msg);
+            else {x=(int)sam_quality+presets;sam_quality=(uint8_t)(x<0?0:x>2?2:x);ui_msg[0]=0;}
+        }
         if(presets && sam_loop==3) {
             static const uint8_t counts[]={4,8,16,27};int i=0;
             while(i<3 && counts[i]!=sam_slices) i++;
@@ -984,6 +989,8 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"sam_layer")) *got=sam_layer;
     else if (!strcmp(what,"sam_dubbing")) *got=sam_dubbing;
     else if (!strcmp(what,"sam_dub_pos")) *got=(int)sam_dub_pos;
+    else if (!strcmp(what,"sam_quality")) *got=sam_quality;
+    else if (!strcmp(what,"sam_rate")) *got=(int)sam_rate();
     else if (!strcmp(what,"sam_slices")) *got=sam_slices;
     else if (!strcmp(what,"fil_on")) *got=fil_seen && fil_on;
     else if (!strcmp(what,"fil_type")) *got=fil_type;

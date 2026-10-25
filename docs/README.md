@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.15-alpha
+# FIELD — experimental 0.1.16-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.15-alpha
+  python3 base/tools/build.py app --release 0.1.16-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -655,3 +655,33 @@ capture lockout, progress, stop, save/reboot, another complete layer, FX
 navigation and returning to Replace. Existing sample, save, filter, delay,
 reverb and pixel-mirror checks pass. Screens were visually inspected.
 Hardware checks: image 579152 B; RAM .data+.bss 130816 B of 131072; pool 308884 B of 311296. Physical-device testing is still needed.
+
+
+## Longer Lo-fi capture on PRESETS (0.1.16)
+
+PRESETS in ARP outside Slice chooses the next replacement capture's 8/4/2 kHz
+rate. The unchanged 21,824-frame ADPCM bank yields 2,728 / 5,456 / 10,912 ms.
+The UI shows rate and capacity beside actual clip duration. Lower rates average
+more incoming frames and reduce high-frequency detail. Capture selection is
+locked during recording. Slice retains its existing PRESETS count control.
+Layer capture stays at the existing clip's rate and reports that lock when the
+user turns PRESETS. Selecting another quality never retunes existing audio.
+
+Playback uses the captured rate for its pitch step. Integer sample position
+and a bounded fractional phase avoid float accumulation drift on longer clips.
+The former zeroed reserved header byte stores the rate shift (0/1/2); header
+size and flash/audio-bank layout are unchanged. Legacy zero means 8 kHz,
+invalid rates are rejected, and SAVE records the actual clip rate rather than
+the next recording choice. Restore sets playback and the selection to it.
+Older FIELD releases still assume 8 kHz for playback of these new Lo-fi clips.
+
+DSP tests cover full capacities and correct-pitch/duration playback at all
+three rates, no-progress stalls, unchanged current-clip pitch when selection
+changes, same-rate overdubs and bank guards. Measured 220 Hz capture SNR is
+36.4 / 29.3 / 23.0 dB. Saved-rate checks cover legacy 8 kHz, exact 4/2 kHz
+audio restore, next-choice isolation and invalid-newest fallback. Host tests
+cover long captures, UI lockouts, saved rates through reboot, Layer's rate
+lock, Slice's unchanged knob mapping and returning to the original setting.
+Existing sampler, layer, FX, filter and pixel-mirror tests pass; screens were
+visually checked. No sample/FX heap allocation or streaming-buffer change.
+Hardware checks: image 579504 B; RAM .data+.bss 130848 B of 131072; pool 308884 B of 311296. Physical-device testing is still needed.
