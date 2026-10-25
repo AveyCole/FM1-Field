@@ -210,3 +210,17 @@ Real FM-1 playback on the user's connection remains to be tested.
 Hardware build: image 576592 B; RAM .data+.bss 130496 B of 131072; pool 308880 B of 311296. RAM and pool allocation are unchanged from 0.1.3;
 image, memory headroom and register-access checks pass. USB identity remains
 FIELD; package identity is `FM-1_84000104`. The browser USB handoff fix is retained.
+
+## USB discovery revision 2
+
+One discovery path now accepts either the running app or its already-running
+loader, waits through enumeration and refreshes MIDI access during retries.
+The one-shot loader probe was removed: it could miss a late loader, then reject
+it as not-running-firmware. Discovery handles Windows-prefixed FIELD names and
+unequal input/output labels. An existing loader proceeds directly to writing,
+then the updater checks the final firmware identity. Failed discovery prints
+actual MIDI port names, states, connection states and probe/open errors locally.
+
+Tests cover delayed loader appearance, a fresh MIDI-access object, unequal
+labels, multiple outputs and Windows-prefixed names. Firmware 0.1.4-alpha is
+unchanged. These tests do not establish actual host-driver behavior.

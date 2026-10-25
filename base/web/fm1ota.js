@@ -152,25 +152,27 @@ async function query(link, cmd, payload = []) {
 }
 
 export class Updater {
-  constructor(access, log) {
+  constructor(access, log, refreshAccess) {
     this.access = access;
+    this.refreshAccess = refreshAccess;
     this.log = log || (() => {});
     this.links = new Set();
   }
 
   // Only probe known FM-1 product/loader names, then verify its identity.
   async find(filter) {
-    const known = (port) => /fm-?1|felucca|ota|composite|sinco|usb-midi|^field\b|^aporee\b/i.test(port.name || "");
+    const known = (port) => /fm-?1|felucca|ota|composite|sinco|usb[- _]?midi|\bfield\b|\baporee\b/i.test((port.name || "") + " " + (port.manufacturer || ""));
     const outs = [...this.access.outputs.values()].filter((p) => p.state !== "disconnected" && known(p));
     for (const input of [...this.access.inputs.values()]) {
       if (input.state === "disconnected" || !known(input)) continue;
       const same = outs.filter((p) => p.name === input.name);
-      const candidates = same.length ? same : outs.length === 1 ? outs : [];
+      const candidates = [...same, ...outs.filter((p) => !same.includes(p))];
       for (const output of candidates) {
         // Each failed probe must release both ports, including partial opens.
         const link = new Link(input, output);
         let keep = false;
         try {
+          this.log(`MIDI probe: ${input.name} → ${output.name}`);
           await input.open(); await output.open();
           if (link.lost) continue;
           const id = await handshake(link, 2);
@@ -179,11 +181,18 @@ export class Updater {
             this.links.add(link);
             return { link, id, name: input.name };
           }
-        } catch (_) { /* the OS may still be replacing this MIDI endpoint */ }
+        } catch (e) { this.log(`MIDI open/probe failed: ${e.name || "Error"}: ${e.message}`); }
         finally { if (!keep) await link.close(); }
       }
     }
     return null;
+  }
+
+  logPorts() {
+    const describe = (ports) => [...ports.values()].map((p) =>
+      `${p.name || "(unnamed)"} [${p.state}/${p.connection}]`).join("; ") || "none";
+    this.log("MIDI inputs: " + describe(this.access.inputs));
+    this.log("MIDI outputs: " + describe(this.access.outputs));
   }
 
   async release() {
@@ -194,14 +203,15 @@ export class Updater {
   async portsChanged(ms) {
     // Listen without replacing another consumer's statechange handler. Polling
     // remains a fallback for browsers that report the re-enumeration late.
+    const access = this.access;
     await new Promise((resolve) => {
       const done = () => {
         clearTimeout(timer);
-        this.access.removeEventListener?.("statechange", done);
+        access.removeEventListener?.("statechange", done);
         resolve();
       };
       const timer = setTimeout(done, ms);
-      this.access.addEventListener?.("statechange", done);
+      access.addEventListener?.("statechange", done);
     });
   }
 
@@ -211,6 +221,10 @@ export class Updater {
       const dev = await this.find(filter);
       if (dev) return dev;
       await this.portsChanged(Math.max(0, Math.min(500, end - Date.now())));
+      if (this.refreshAccess) {
+        try { this.access = await this.refreshAccess(); }
+        catch (e) { this.log(`MIDI access refresh: ${e.message}`); }
+      }
     }
     return null;
   }
@@ -248,21 +262,38 @@ export class Updater {
   // full install: running firmware -> loader -> new firmware
   async install(image, product, onStep, sha256) {
     const step = onStep || (() => {});
-    const dev = await this.find((id) => !IS_OTA(id));
-    if (!dev) throw fail("notfound", "FM-1 not found (USB cable, and no other app using it?)");
+    // One discovery path accepts either application or loader, including a
+    // loader that appears while the browser is still refreshing its port map.
+    const dev = await this.waitFor(() => true, 15000);
+    if (!dev) {
+      this.logPorts();
+      throw fail("notfound", "Neither running firmware nor update loader answered. See the MIDI port list below.");
+    }
     const [model] = product.split("_");
-    if (dev.id.model !== model) { await dev.link.close(); throw fail("model", `the device is ${dev.id.text}, the package is for ${product}`); }
-    if (dev.id.open) await this.arm(dev, image, product, sha256);
+    const isLoader = IS_OTA(dev.id);
+    if (dev.id.model !== (isLoader ? "ota-" + model : model)) {
+      await dev.link.close(); throw fail("model", `the device is ${dev.id.text}, the package is for ${product}`);
+    }
+    this.log(`Connected: ${dev.name} — ${dev.id.text}`);
     step("start", dev.id.text);
-    dev.link.send(UPGRADE);
-    await sleep(2000);
-    const s1 = await this.serve(dev.link, image, 0xE0000000, 8000, (n, b) => step("verify", n, b));
-    await dev.link.close();
-    if (!s1.finished) throw fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
-    step("loader");
-    await sleep(3000);
-    const ota = await this.waitFor(IS_OTA, 30000);
-    if (!ota) throw fail("noloader", "the update loader did not appear. Replug the USB cable and press Install again: the device stays in update mode until it is finished.");
+    let ota = dev;
+    if (!isLoader) {
+      if (dev.id.open) await this.arm(dev, image, product, sha256);
+      dev.link.send(UPGRADE);
+      await sleep(2000);
+      const s1 = await this.serve(dev.link, image, 0xE0000000, 8000, (n, b) => step("verify", n, b));
+      await dev.link.close();
+      if (!s1.finished) throw fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
+      step("loader");
+      await sleep(3000);
+      ota = await this.waitFor(IS_OTA, 30000);
+      if (!ota) {
+        this.log("No update loader answered after switching modes.");
+        this.logPorts();
+        throw fail("noloader", "The update loader did not answer. See the MIDI connection details below.");
+      }
+      this.log(`Loader: ${ota.name} — ${ota.id.text}`);
+    }
     const s2 = await this.write(ota, image, step);
     if (!s2.finished) throw fail(s2.lost ? "lost" : "stopped", `the loader ${s2.lost ? "was disconnected" : "stopped"} after ${s2.served} requests. Replug and press Install again to resume.`);
     step("reboot");

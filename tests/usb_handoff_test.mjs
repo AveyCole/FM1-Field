@@ -84,3 +84,28 @@ const events=new Device(), watcher=new Updater(events);
 const waiting=watcher.portsChanged(1000);for(const fn of events.listeners)fn();await waiting;
 assert.equal(events.listeners.size,0);await watcher.portsChanged(1);assert.equal(events.listeners.size,0);
 console.log('PASS: state-change wake and polling timeout clean up listeners');
+// The loader can arrive after the initial Install click. Windows can expose
+// different input/output names while retaining another connected MIDI output.
+const late=new Device();
+for(const p of [...late.inputs.values(),...late.outputs.values()])p.state='disconnected';
+late.outputs.set('ghost',{name:'FIELD ghost',state:'connected',connection:'closed',open:async()=>{},close:async()=>{},send(){}});
+setTimeout(()=>{
+  late.enter('loader');
+  late.inputs.get(`in-${late.serial}`).name='MIDIIN2 (Felucca Update)';
+  late.outputs.get(`out-${late.serial}`).name='MIDIOUT2 (Felucca Update)';
+  for(const fn of late.listeners)fn();
+},100);
+const staleAccess={inputs:new Map(),outputs:new Map(),
+  addEventListener:late.addEventListener.bind(late),removeEventListener:late.removeEventListener.bind(late)};
+let refreshes=0;const lateUpdater=new Updater(staleAccess,undefined,async()=>{refreshes++;return late;});
+const lateSteps=[];
+assert.equal(await lateUpdater.install(new Uint8Array(512).fill(73),PRODUCT,k=>lateSteps.push(k)),PRODUCT);
+assert.equal(late.writes,1,'already-running loader skips staging');
+assert.deepEqual(lateSteps,['start','write','reboot','done']);
+assert(refreshes>0);await lateUpdater.release();
+console.log('PASS: delayed loader discovery, mismatched port names, multiple outputs, fresh MIDI access, direct write and return verification');
+const prefixed=new Device();
+prefixed.inputs.get('in-1').name='MIDIIN2 (FIELD)';prefixed.outputs.get('out-1').name='MIDIOUT2 (FIELD)';
+const prefixUpdater=new Updater(prefixed),found=await prefixUpdater.find();
+assert.equal(found?.id.text,PRODUCT);await prefixUpdater.release();
+console.log('PASS: Windows-prefixed FIELD input/output names recognized');
