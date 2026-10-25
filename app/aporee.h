@@ -11,3 +11,4 @@ extern volatile int ap_state;
 extern volatile uint32_t ap_bytes;
 extern char ap_why[32];
 int ap_start(uint16_t region);
+int ap_start_near(int32_t lat,int32_t lon);

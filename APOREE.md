@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.5-alpha
+# FIELD — experimental 0.1.6-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -10,7 +10,9 @@ The original CREATURE firmware in the parent workspace is independent.
 - PLAY: play / stop. GLO: WiFi setup, scan, saved or hidden network, password entry.
 - SEL: toggle location/coordinates and recording author/licence details.
 - SELECT / knob 4: another random recording. MASTER: volume.
-- Hold a white key: the reference radio's effects. ARP: its optional synth.
+- Keys on the player and ARP play the same sample. ARP opens its editor; REC captures there.
+- ENV opens the original live effects on white keys, clearing the sample to reuse its memory.
+- EDIT toggles a fixed 50 km Near mode on the player; the header shows Near.
 - Hold HOME: controls. OCT− and OCT+ held together retain the platform's update entry.
 - SAVE: browse countries, then states/provinces. SELECT moves, SEL opens,
   PLAY starts random playback in the highlighted region. A country has a
@@ -123,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.5-alpha
+  python3 base/tools/build.py app --release 0.1.6-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -257,3 +259,57 @@ and memory/register checks pass: image 578752 B; RAM .data+.bss 130528 B of 1310
 Run the new tests with `PYTHON=python3 sh tests/run_field_favorites.sh` (requires
 the host build dependencies), plus `sh tests/run_stream_tests.sh` and
 `node tests/usb_handoff_test.mjs`.
+
+## Startup, Near, sampler and ENV effects (0.1.6)
+
+The new original startup artwork combines a geometric FIELD wordmark, FM1,
+terrain contours, a waveform and a globe, with THE WORLD, RECORDED. It uses six
+40-row strips of the existing canvas: no image buffer, extra font, animation or
+artificial delay. The host `splash` command renders exactly the same function.
+
+EDIT on the player toggles Near, visibly shown in the header and NEAR / 50 KM
+label. The current recording becomes a fixed anchor. A 50 km great-circle
+haversine filter is applied to streamed Aporee coordinates, independent of
+political borders. It handles longitude wrapping and poles. The nearby reservoir
+uses the existing region cache, preserving the world cache; changing the anchor
+invalidates the nearby cache. The first selection requires a full location-index
+scan. It never falls back to a more distant location. The flag and coordinates
+are saved in OBJ_RADIO; old settings load with Near off and synth settings intact.
+Choosing a region/world from SAVE turns Near off. EDIT does not interrupt the
+current sound; the next shuffle applies the selection mode.
+
+ARP replaces the synth editor with a single-clip sampler. REC captures up to
+21,824 mono samples at 8 kHz (2.728 seconds), using IMA ADPCM in 64-sample blocks
+with predictor/index headers. The bank is the existing 12,288-byte FX history,
+with a 128-byte decoded-block cache for pitched access. Capture averages source
+frames before keyboard mixing; network stalls do not add silence. REC again
+finishes early, as do leaving ARP or changing/stopping the source. K1/K2 trim,
+K3 transposes, K4/SELECT set level, OCT transposes by octaves, SEL toggles loop,
+PLAY auditions/stops, and both the player and ARP keyboards play the same clip.
+C4 is original pitch. Playback is monophonic; one shots continue after key release,
+loops release when their triggering key is lifted. Short fades soften boundaries.
+In ARP, a ready clip is auditioned without the live radio; on the player it is
+mixed over the live radio. The former optional synth is no longer in the UI.
+
+ENV opens a separate live-effects page. Its white keys retain the original 16
+effects; FX taps tempo. Entering ENV explicitly clears any temporary clip and
+zeros the shared history; the screen reports Sample cleared for FX. Sampler and
+effects never own the buffer simultaneously. ENV/HOME returns to the player,
+and ARP returns to an empty sampler. Samples are not saved to flash and disappear
+on power-off. REC still saves favorites on the player and in ENV, and SEQ opens
+favorites. The compressed ring, PCM ring, TCP window and WiFi configuration are
+unchanged. USB discovery changes from earlier releases are retained, but the
+user's intermittent hardware/browser detection issue remains unconfirmed.
+
+Validation: capture length and guard bytes, full/partial capture, paused input,
+decode fidelity (35.7 dB SNR for the test sine), trim safety, keyboard replay on
+both screens, controls and exclusive FX handoff pass. Near tests use captured
+public Aporee responses and check cache restoration, date line, poles, and the
+radius boundary. Persistent toggle and failed-write behavior pass host tests.
+Existing favorites, regional browsing, TLS crypto, scheduler and USB updater
+regressions pass. The FM-1 build passes memory and register-access checks:
+image 579744 B; RAM .data+.bss 130592 B of 131072; pool 308880 B of 311296. Real-device playback, sampler CPU load and USB detection still need testing.
+
+Run `PYTHON=python3 APOREE_TEST_STREAM=/path/to/long.mp3 sh tests/run_field_modes.sh`.
+The real API fixture test is `cc -O1 -Ibase/include tests/aporee_net_test.c -o
+/tmp/aporee_test && /tmp/aporee_test tmp-locations.json tmp-playlist.json`.

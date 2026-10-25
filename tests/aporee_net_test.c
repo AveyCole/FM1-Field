@@ -75,6 +75,18 @@ int main(int argc,char **argv) {
     assert(ap_start(0)==0&&ap_state==AP_DONE);
     assert((unsigned)request_count==requests+1u&&ap_n==world_remaining-1u);
     assert(ap_start((uint16_t)ap_region_total())==-1);
+    unsigned saved_world=ap_n;
+    assert(ap_start_near(525200,134050)==0 && ap_state==AP_DONE && ap_cache_near);
+    assert(ap_near_contains(ap_track.lat,ap_track.lon,525200,134050));
+    for(unsigned i=0;i<ap_n;i++) assert(ap_near_contains(ap_locs[i].lat,ap_locs[i].lon,525200,134050));
+    requests=(unsigned)request_count;
+    assert(ap_start_near(525200,134050)==0 && ap_state==AP_DONE && (unsigned)request_count==requests+1u);
+    assert(ap_start(0)==0 && ap_state==AP_DONE && !ap_cache_near && ap_n==saved_world-1);
+    assert(ap_start_near(910000,0)==-1);
+    assert(ap_near_contains(0,-1799000,0,1799000));
+    assert(ap_near_contains(899000,1800000,899000,0));
+    assert(ap_near_contains(4490,0,0,0) && !ap_near_contains(4510,0,0,0));
+    puts("PASS: fixed 50 km Near filter, date line/poles, nearby cache and world restoration");
     puts("PASS: country/state filtering, one-location regions, worldwide cache restoration, invalid region rejection");
     puts("PASS: real Aporee index/playlist, 32 unique locations, refill, bytewise JSON, coordinates, incomplete/error responses");
 }

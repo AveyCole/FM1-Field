@@ -1,0 +1,30 @@
+splash
+shot field-startup.png
+wait 3500
+expect page 0
+tap EDIT
+expect ap_near 1
+expect ap_near_lat 525200
+wait 200
+shot field-near.png
+tap OCT+
+wait 400
+expect ap_near 1
+expect ap_near_lat 525200
+expect ap_lat 525300
+reboot
+wait 200
+expect ap_near 1
+expect ap_near_lat 525200
+tap EDIT
+expect ap_near 0
+flash_fail 1
+tap EDIT
+expect ap_near 0
+expect ap_fav_status 5
+flash_fail 0
+tap EDIT
+expect ap_near 1
+tap SAVE
+tap PLAY
+expect ap_near 0

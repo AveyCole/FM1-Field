@@ -56,6 +56,7 @@ static const char *wifi_status_str(void)
 }
 
 #include "synth.c"
+#include "sampler.c"
 
 /* ---- the station of the last session (OBJ_RADIO), and the synth's settings (saved before them: older saves
  * end at st_title, and load with the synth at its defaults) */
@@ -66,6 +67,7 @@ static struct {
     uint16_t country;
     char place[32], st_id[12], st_title[32];
     synth_set_t syn;
+    int32_t near_lat,near_lon;
 } rset;
 static void rset_load(void)
 {
@@ -77,10 +79,13 @@ static void rset_load(void)
         rset.playing = 1;
         n = 0;
     }
-    if (n < (int)sizeof rset)
+    if (n < (int)((char *)&rset.syn-(char *)&rset)+(int)sizeof rset.syn)
         rset.syn = SYN_DEFAULT;
+    if(n < (int)sizeof rset || rset.near_lat < -900000 || rset.near_lat > 900000 ||
+       rset.near_lon < -1800000 || rset.near_lon > 1800000) rset.rsv=0;
+    rset.rsv &= 1u;
     syn = rset.syn;
-    synth_init();
+
 }
 static void rset_save(void) { plat_store_save(OBJ_RADIO, &rset, sizeof rset); }
 
@@ -191,8 +196,9 @@ static void tempo_tap(void)
 #define K_TEXT RGB(246, 239, 216)
 #define K_CORAL RGB(205, 139, 91)
 #define K_TEAL RGB(160, 187, 125)
+#include "field_splash.c"
 
-enum { PG_HOME, PG_BROWSE, PG_WIFI, PG_NETS, PG_PASS, PG_HELP, PG_SYNTH, PG_FAV, PG_REGION };
+enum { PG_HOME, PG_BROWSE, PG_WIFI, PG_NETS, PG_PASS, PG_HELP, PG_SYNTH, PG_FAV, PG_REGION, PG_EFFECTS };
 static uint8_t ui_page, ui_dirty = 1;
 static int ui_sel, ui_top;
 static uint32_t ui_scan_t;                        /* the scan asked for (ms), 0 = none waiting */
@@ -436,81 +442,53 @@ static void ui_pass(void)
 
 static void ui_page_set(int pg);
 
-/* ---- the Synth page (ARP): the keys play app/synth.c over the radio */
-static uint32_t syn_keys;                         /* held, as last seen */
-static int8_t syn_key_note[NKEYS];                /* the note each held key started (an octave change between
-                                                   * its down and up must not leave it sounding) */
-static uint8_t syn_changed;                       /* settings changed, not saved yet: saved 5 s after the last
-                                                   * change, or on leaving */
-static uint32_t syn_changed_t;
-
-static void ui_synth_wave(int slot, uint32_t y)   /* the wave's shape, and the level */
+/* ARP edits the same temporary sample played by the main keyboard. */
+static uint32_t sam_keys;
+static int8_t sam_key=-1;
+static void effects_open(void)
 {
-    char key[UI_KEY], lv[24];
-    int i;
-    snprintf(lv, sizeof lv, "level %u%%", (unsigned)(syn.level * 100u / 127u));
-    snprintf(key, sizeof key, "W%u|%s|%d", syn.wave, lv, radio_st == RS_PLAYING);
-    if (w_eq(ui_key[slot], key))
-        return;
-    memcpy(ui_key[slot], key, sizeof key);
-    cv_begin(240, 24, K_BG);
-    {
-        float m = (float)syn.wave * (3.0f / 127.0f), t;
-        int s = (int)m;
-        if (s > 2)
-            s = 2;
-        t = m - (float)s;
-        for (i = 0; i < 96; i++) {
-            float ph = (float)i / 96.0f;
-            float v = syn_shape(s, ph, 0.0f) * (1.0f - t) + syn_shape(s + 1, ph, 0.0f) * t;
-            cv_rect(16 + i, 12 - (int32_t)(v * 9.0f), 1, 2, K_TEAL);
-        }
-    }
-    cv_text(224 - text_w(&FONT_S, lv), (24 - (int32_t)FONT_S.h) / 2, &FONT_S, lv, K_TEXT);
-    cv_blit(0, y);
+    int had_sample=sam_state!=SAM_EMPTY;
+    sam_voice=sam_gate=0;sam_state=SAM_EMPTY;sam_len=0;
+    sam_active=0;sam_keys=0;
+    if(fx_hist) memset(fx_hist,0,FX_HIST*sizeof *fx_hist);
+    fx_reset();fx_mode=1;ui_page_set(PG_EFFECTS);
+    if(had_sample) w_cpy(ui_msg,"Sample cleared for FX",sizeof ui_msg);
 }
-
-static void ui_synth(void)
+static void ui_effects(void)
 {
-    static const char *const WV[4] = {"sine", "triangle", "saw", "square"};
-    char a[24], b[24], c[24], d[24], o[16];
-    snprintf(a, sizeof a, "%s", WV[(syn.wave * 3 + 63) / 127]);
-    snprintf(b, sizeof b, "%u Hz", (unsigned)synth_cutoff_hz());
-    snprintf(c, sizeof c, "%u ms", (unsigned)synth_attack_ms());
-    snprintf(d, sizeof d, "%u ms", (unsigned)synth_release_ms());
-    snprintf(o, sizeof o, "OCT %+d", syn.octave);
-    ui_title(0, "Synth", o);
-    ui_cell(1, 8, 42, "K1", "WAVE", a, 0);
-    ui_cell(2, 120, 42, "K2", "FILTER", b, 0);
-    ui_cell(3, 8, 88, "K3", "ATTACK", c, 0);
-    ui_cell(4, 120, 88, "K4", "RELEASE", d, 0);
-    ui_synth_wave(5, 136);
-    ui_piano(6, 164, -1, syn_keys);
-    ui_row(13, 214, 26, "SELECT level  OCT-/+", "HOME back", K_DIM, K_DIM, K_PANEL);
+    unsigned k;const char *name=ui_msg[0]?ui_msg:"White keys / hold for FX";
+    for(k=0;k<FX_N;k++) if(fx_held>>k&1u) {name=FX_NAME[k];break;}
+    ui_title(0,"Effects","Live FX");
+    ui_row(1,42,24,name,"",K_CORAL,K_DIM,K_BG);
+    ui_row(2,70,24,"Keys 1-4","filter / crush",K_TEXT,K_DIM,K_BG);
+    ui_row(3,94,24,"Keys 5-8","tempo stutters",K_TEXT,K_DIM,K_BG);
+    ui_row(4,118,24,"Keys 9-12","tape / reverse / chop",K_TEXT,K_DIM,K_BG);
+    ui_row(5,142,24,"Keys 13-16","ring / half / mute / lo-fi",K_TEXT,K_DIM,K_BG);
+    ui_piano(6,174,-1,plat_keys());
+    ui_row(13,214,26,"FX tap tempo","ENV back",K_DIM,K_DIM,K_PANEL);
 }
-
-static int syn_knob(uint8_t *v, int32_t d)       /* a knob's detents, 2 steps each, 0..127; changed? */
+static int sam_knob(uint8_t *v,int32_t d)
 {
-    int32_t x = (int32_t)*v + 2 * d;
-    if (!d)
-        return 0;
-    x = x < 0 ? 0 : x > 127 ? 127 : x;
-    if (x == *v)
-        return 0;
-    *v = (uint8_t)x;
-    return 1;
+    int x=(int)*v+2*d;
+    if(!d) return 0;
+    x=x<0?0:x>127?127:x;*v=(uint8_t)x;return 1;
 }
-
-static void synth_leave(void)                     /* back to Home: notes let go, the settings kept */
+static void ui_sampler(void)
 {
-    synth_all_off();
-    syn_keys = 0;
-    if (syn_changed) {
-        syn_changed = 0;
-        rset.syn = syn;
-        rset_save();
-    }
-    ui_page_set(ap_player_page());
+    char a[20],b[20],c[20],d[20],status[40];
+    ui_title(0,"Sampler",sam_loop?"Loop":"One shot");
+    if(sam_state==SAM_CAPTURE) snprintf(status,sizeof status,"Capturing %u%%",(unsigned)(sam_len*100u/SAM_FRAMES));
+    else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/SAM_RATE));
+    else w_cpy(status,ui_msg[0]?ui_msg:"REC captures / 2.7s mono",sizeof status);
+    ui_row(1,40,28,status,"",sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
+    snprintf(a,sizeof a,"%u%%",(unsigned)(sam_start*100u/127u));
+    snprintf(b,sizeof b,"%u%%",(unsigned)(sam_end*100u/127u));
+    snprintf(c,sizeof c,"%+d st",sam_pitch+12*sam_oct);
+    snprintf(d,sizeof d,"%u%%",(unsigned)(sam_level*100u/127u));
+    ui_cell(2,8,76,"K1","START",a,0);ui_cell(3,120,76,"K2","END",b,0);
+    ui_cell(4,8,122,"K3","PITCH",c,0);ui_cell(5,120,122,"K4","LEVEL",d,0);
+    ui_piano(6,174,-1,sam_keys);
+    ui_row(13,214,26,"REC capture  SEL loop","ARP back",K_DIM,K_DIM,K_PANEL);
 }
 
 static void ui_draw(void)
@@ -531,13 +509,19 @@ static void ui_draw(void)
     case PG_WIFI: ui_status(); break;
     case PG_NETS: ui_nets(); break;
     case PG_PASS: ui_pass(); break;
-    case PG_SYNTH: ui_synth(); break;
+    case PG_SYNTH: ui_sampler(); break;
+    case PG_EFFECTS: ui_effects(); break;
     default: ui_help(); break;
     }
 }
 
 static void ui_page_set(int pg)
 {
+    if(ui_page==PG_EFFECTS && pg!=PG_EFFECTS) {fx_mode=0;fx_held=0;fx_wire=0;}
+    if(ui_page==PG_SYNTH && pg!=PG_SYNTH) {
+        sam_exit();
+
+    }
     if(ui_page==PG_FAV && pg!=PG_FAV) ap_fav_close();
     ui_page = (uint8_t)pg;
     ui_dirty = 1;
@@ -660,7 +644,8 @@ void app_init(void)
 {
     /* Reserve the large stream buffers before WiFi's task allocations fragment the heap. */
     (void)radio_alloc();
-    fx_reset();
+    sam_init(fx_hist);
+    fx_mode=0;fx_held=0;
     rset_load();
 }
 
@@ -711,30 +696,37 @@ static void input(void)
             down &= ~(1u << B_HOME);
         }
     }
-    {   /* the white keys, held on Home: the punch-in FX (a wire command's 0x47 holds one too) */
-        uint32_t keys = (ui_page == PG_HOME || ui_page == PG_REGION) ? plat_keys() : 0u, h = 0;
-        int w;
-        for (w = 0; w < 16; w++)
-            if (keys >> WHITE_KEY[w] & 1u)
-                h |= 1u << w;
-        fx_held = h | fx_wire;
+    {   /* One shared keyboard on the player and sample editor. */
+        uint32_t keys=(ui_page==PG_HOME || ui_page==PG_REGION || ui_page==PG_SYNTH)?plat_keys():0u;
+        uint32_t on=keys&~sam_keys,off=sam_keys&~keys;int k;
+        if(sam_key>=0 && (off>>(unsigned)sam_key&1u) && sam_loop) sam_gate=0;
+        if(ui_page!=PG_HOME && ui_page!=PG_REGION && ui_page!=PG_SYNTH) sam_gate=0;
+        sam_keys=keys;
+        for(k=0;k<NKEYS;k++) if(on>>k&1u) {sam_note(53+k);sam_key=(int8_t)k;}
+    }
+    {
+        uint32_t keys=ui_page==PG_EFFECTS?plat_keys():0u,h=0;int w;
+        for(w=0;w<16;w++) if(keys>>WHITE_KEY[w]&1u) h|=1u<<w;
+        fx_held=ui_page==PG_EFFECTS?h|fx_wire:0u;
     }
     if (ui_page == PG_HOME || ui_page == PG_REGION) {
-        if (down & (1u << B_FX))
-            tempo_tap();
+        if(down&(1u<<B_ENV)) {effects_open();return;}
         if (down & (1u << B_PLAY))
             radio_toggle();
         if (down & (1u << B_ARP)) {
-            syn_keys = 0;
+            if(!fx_hist) {ap_fav_notice(7);return;}
+            sam_enter();sam_keys=0;sam_key=-1;
             ui_page_set(PG_SYNTH);
             return;
         }
         if (down & ((1u << B_OCTDN) | (1u << B_OCTUP))) ap_shuffle();
         if (down & (1u << B_SEL)) ap_info = !ap_info;
+        if (down & (1u << B_EDIT)) ap_near_toggle();
         if (down & (1u << B_SAVE)) {ap_regions_open();ui_page_set(PG_BROWSE);}
         if (down & (1u << B_REC)) ap_fav_save();
         if ((down & (1u << B_SEQ)) && ap_fav_open()) {ui_page_set(PG_FAV);return;}
         if (ui_page == PG_REGION && (down & (1u << B_HOME))) {
+            ap_near_leave();
             ap_active_region=0;ap_shuffle();ui_page_set(PG_HOME);
         }
         sel_turn(3, plat_enc(EN_K4) + turn);
@@ -802,43 +794,44 @@ static void input(void)
             }
         }
     } else if (ui_page == PG_SYNTH) {
-        uint32_t keys = plat_keys(), on = keys & ~syn_keys, off = syn_keys & ~keys;
-        int k, ch = 0;
-        syn_keys = keys;
-        for (k = 0; k < NKEYS; k++) {
-            if (off >> k & 1u)
-                synth_note_off(syn_key_note[k]);
-            if (on >> k & 1u) {
-                syn_key_note[k] = (int8_t)(53 + k + 12 * syn.octave);   /* F3 = MIDI 53 */
-                synth_note_on(syn_key_note[k]);
-            }
+        int x;
+        if(down&(1u<<B_ENV)) {effects_open();return;}
+        sam_knob(&sam_start,plat_enc(EN_K1));
+        if(sam_start>125) sam_start=125;
+        sam_knob(&sam_end,plat_enc(EN_K2));
+        if(sam_end<=sam_start) sam_end=sam_start+1u;
+        x=sam_pitch+plat_enc(EN_K3);sam_pitch=(int8_t)(x < -24?-24:x>24?24:x);
+        sam_knob(&sam_level,plat_enc(EN_K4)+turn);
+        if((down&(1u<<B_OCTDN)) && sam_oct>-2) sam_oct--;
+        if((down&(1u<<B_OCTUP)) && sam_oct<2) sam_oct++;
+        if(down&(1u<<B_SEL)) sam_loop=!sam_loop;
+        if(down&(1u<<B_REC)) {
+            if(sam_state==SAM_CAPTURE || radio_st==RS_PLAYING) {ui_msg[0]=0;sam_record();}
+            else w_cpy(ui_msg,"Wait for PLAYING",sizeof ui_msg);
         }
-        ch |= syn_knob(&syn.wave, plat_enc(EN_K1));
-        ch |= syn_knob(&syn.cutoff, plat_enc(EN_K2));
-        ch |= syn_knob(&syn.attack, plat_enc(EN_K3));
-        ch |= syn_knob(&syn.release, plat_enc(EN_K4));
-        ch |= syn_knob(&syn.level, turn);
-        if ((down & (1u << B_OCTDN)) && syn.octave > -2)
-            syn.octave--, ch = 1;
-        if ((down & (1u << B_OCTUP)) && syn.octave < 2)
-            syn.octave++, ch = 1;
-        if (ch) {
-            synth_update();
-            syn_changed = 1;
-            syn_changed_t = plat_ms();
+        if(down&(1u<<B_PLAY)) {
+            if(sam_voice) sam_gate=0;
+            else {sam_note(60);sam_key=-1;}
         }
-        if (syn_changed && plat_ms() - syn_changed_t >= 5000u) {   /* kept through a power-off too */
-            syn_changed = 0;
-            rset.syn = syn;
-            rset_save();
-        }
-        if (down & ((1u << B_HOME) | (1u << B_ARP)))
-            synth_leave();
+        if(down&((1u<<B_HOME)|(1u<<B_ARP))) ui_page_set(ap_player_page());
+    } else if(ui_page==PG_EFFECTS) {
+        if(down&(1u<<B_FX)) tempo_tap();
+        if(down&(1u<<B_REC)) ap_fav_save();
+        if((down&(1u<<B_SEQ)) && ap_fav_open()) {ui_page_set(PG_FAV);return;}
+        if(down&(1u<<B_PLAY)) radio_toggle();
+        if(down&((1u<<B_ENV)|(1u<<B_HOME))) ui_page_set(ap_player_page());
+        if(down&(1u<<B_ARP)) {sam_enter();ui_page_set(PG_SYNTH);}
     }
 }
 void app_input_only(void) { input(); }
 
 #ifdef PLAT_HOST
+int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
+{
+    (void)a;(void)b;(void)c;(void)d;
+    if(strcmp(cmd,"splash")) return 0;
+    app_splash();return 1;
+}
 int app_expect(const char *what, int *got)       /* the host simulator's checks (the .host scripts in tests) */
 {
     int i, n = 0;
@@ -856,6 +849,10 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
         *got = atoi(ap_now.id);
     else if (!strcmp(what, "ap_url_matches"))
         *got = !strcmp(play_url,ap_now.url);
+    else if (!strcmp(what, "ap_near"))
+        *got = rset.rsv;
+    else if (!strcmp(what, "ap_near_lat"))
+        *got = rset.near_lat;
     else if (!strcmp(what, "ap_want"))
         *got = radio_want;
     else if (!strcmp(what, "ap_completed"))
@@ -876,6 +873,13 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
         *got = ap_active_region;
     else if (!strcmp(what, "ap_browse_level"))
         *got = ap_browse_level;
+    else if (!strcmp(what,"sam_active")) *got=sam_active;
+    else if (!strcmp(what,"sam_state")) *got=sam_state;
+    else if (!strcmp(what,"sam_len")) *got=(int)sam_len;
+    else if (!strcmp(what,"sam_voice")) *got=sam_voice;
+    else if (!strcmp(what,"sam_loop")) *got=sam_loop;
+    else if (!strcmp(what,"sam_pitch")) *got=sam_pitch;
+    else if (!strcmp(what,"fx_mode")) *got=fx_mode;
     else if (!strcmp(what, "syn_wave"))
         *got = syn.wave;
     else if (!strcmp(what, "syn_cutoff"))
@@ -903,15 +907,10 @@ static void lights(void)
 {
     uint32_t lb = 0, lk = 0;
     if (ui_page == PG_HOME || ui_page == PG_REGION) {
-        int w;
-        lb = 1u << B_PLAY | 1u << B_GLO | 1u << B_SEL | 1u << B_SAVE | 1u << B_REC | 1u << B_SEQ | 1u << B_OCTDN | 1u << B_OCTUP;
+        lb = 1u << B_PLAY | 1u << B_GLO | 1u << B_SEL | 1u << B_SAVE | 1u << B_REC | 1u << B_SEQ | 1u << B_EDIT | 1u << B_OCTDN | 1u << B_OCTUP;
         if(ui_page==PG_REGION) lb|=1u<<B_HOME;
-        if ((plat_ms() - tempo_t0) % (60000u / tempo_bpm) < 90u)
-            lb |= 1u << B_FX;                     /* FX flashes on the beat */
-        if (radio_st == RS_PLAYING)               /* the FX keys, and the held ones off as they play */
-            for (w = 0; w < 16; w++)
-                if (!(fx_held >> w & 1u))
-                    lk |= 1u << WHITE_KEY[w];
+        lb|=1u<<B_ARP|1u<<B_ENV;
+        if(sam_state==SAM_READY) lk=((1u<<NKEYS)-1u)&~sam_keys;
     } else if (ui_page == PG_BROWSE) {
         lb = 1u << B_SEL | 1u << B_HOME | 1u << B_PLAY;
     } else if (ui_page == PG_FAV) {
@@ -926,8 +925,13 @@ static void lights(void)
         lk = (1u << NKEYS) - 1u;
     }
     if (ui_page == PG_SYNTH) {
-        lb = 1u << B_HOME | 1u << B_ARP | 1u << B_OCTDN | 1u << B_OCTUP;
-        lk = ((1u << NKEYS) - 1u) & ~syn_keys;    /* the keys lit, the held ones off */
+        lb = 1u << B_HOME | 1u << B_ARP | 1u << B_OCTDN | 1u << B_OCTUP | 1u << B_SEL | 1u << B_PLAY | 1u << B_REC;
+        lb|=1u<<B_ENV;
+        lk = ((1u << NKEYS) - 1u) & ~sam_keys;    /* the keys lit, the held ones off */
+    }
+    if(ui_page==PG_EFFECTS) {
+        lb=1u<<B_ENV|1u<<B_HOME|1u<<B_ARP|1u<<B_PLAY|1u<<B_FX|1u<<B_GLO|1u<<B_REC|1u<<B_SEQ;
+        lk=((1u<<NKEYS)-1u)&~plat_keys();
     }
     plat_leds(lb, lk);
 }
@@ -1047,6 +1051,12 @@ int ap_start(uint16_t region) {
         ap_state=delay?AP_BUSY:AP_DONE;
     }
     return 0;
+}
+int ap_start_near(int32_t lat,int32_t lon)
+{
+    int rc=ap_start(0);
+    ap_track.lat=lat+100;ap_track.lon=lon+100;
+    return rc;
 }
 int radio_net_start(const char *u,uint8_t *b,uint32_t n) {
     const char *fixture=getenv("APOREE_TEST_MP3");

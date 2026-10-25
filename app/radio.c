@@ -92,6 +92,7 @@ static int16_t *pcm_tmp;                          /* MINIMP3_MAX_SAMPLES_PER_FRA
 
 #define FX_HIST 6144u                             /* the FX history, half-rate samples: ~279 ms */
 static int16_t *fx_hist;
+static volatile uint8_t fx_mode;
 
 /* Aporee supplies MP3s. No AAC decoder or permanently reserved AAC arena. */
 static uint8_t dec_kind; /* 0 none, 1 MP3 */
@@ -126,7 +127,7 @@ static int radio_alloc(void)
         pcm_buf = 0;
         return -1;
     }
-    if (!fx_hist) {                               /* the FX history, kept: without it, no stutters */
+    if (!fx_hist) {                               /* former FX buffer, now the sample bank */
         fx_hist = malloc(FX_HIST * sizeof *fx_hist);
         if (fx_hist)
             memset(fx_hist, 0, FX_HIST * sizeof *fx_hist);
@@ -509,6 +510,7 @@ static void radio_render(int32_t *o, uint32_t n)
     uint32_t step = radio_step, w = pcm_w;
     for (i = 0; i < n; i++) {
         float l = 0.0f, rr = 0.0f;
+        int fresh=playing && r!=w;
         if (playing && r != w) {                  /* linear between frame r and the next */
             const int16_t *s = &pcm_buf[(r % PCM_FRAMES) * 2u];
             const int16_t *s1 = r + 1u != w ? &pcm_buf[((r + 1u) % PCM_FRAMES) * 2u] : s;
@@ -523,10 +525,12 @@ static void radio_render(int32_t *o, uint32_t n)
         } else if (playing) {
             radio_underruns++;
         }
-        if (playing)
-            fx_process(&l, &rr);
-        {   /* the synth over it (app/synth.c), the sum held to full scale */
-            float sy = synth_next();
+        sam_capture(l,rr,fresh);
+        if(playing && fx_mode) fx_process(&l,&rr);
+
+        {   /* the sample over the live radio; editor auditions the clip alone */
+            float sy = sam_next();
+            if(sam_active && sam_state==SAM_READY) l=rr=0;
             l = fm_clampf(l + sy, -1.0f, 1.0f);
             rr = fm_clampf(rr + sy, -1.0f, 1.0f);
         }

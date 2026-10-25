@@ -5,6 +5,7 @@
 #include "../aporee.h"
 #include "../aporee_json.h"
 #include "../regions.c"
+#include "../near.h"
 volatile int ap_state;
 volatile uint32_t ap_bytes;
 char ap_why[32];
@@ -13,6 +14,8 @@ typedef struct { uint32_t id; int32_t lat, lon; } ap_loc_t;
 static ap_loc_t *ap_locs, *ap_world_locs; /* two 32-location caches, allocated together */
 static unsigned ap_world_n;
 static uint16_t ap_cache_region;
+static uint8_t ap_cache_near;
+static int32_t ap_cache_lat,ap_cache_lon;
 static unsigned ap_n, ap_seen;
 static uint32_t ap_rng, ap_last;
 static unsigned ap_rand(unsigned n)
@@ -72,7 +75,8 @@ static void ap_object(void *ctx)
 {
     ap_reader_t *r = ctx;
     if (!r->playlist) {
-        if (r->loc.id && r->lat_ok && r->lon_ok && ap_region_matches(r->loc.id,ap_cache_region)) {
+        if (r->loc.id && r->lat_ok && r->lon_ok && (ap_cache_near?
+            ap_near_contains(r->loc.lat,r->loc.lon,ap_cache_lat,ap_cache_lon):ap_region_matches(r->loc.id,ap_cache_region))) {
             unsigned pick = ap_rand(++ap_seen);
             if (ap_n < 32) ap_locs[ap_n++] = r->loc;
             else if (pick < 32) ap_locs[pick] = r->loc;
@@ -119,7 +123,7 @@ static void ap_task(void *arg)
         strcpy(u, "https://aporee.org/api/maps/getAllLocations");
         if (ap_get(r, u, sizeof u)) { ap_n = 0; goto done; }
     }
-    if (!ap_n) { why_to(ap_why, "no locations in region"); goto done; }
+    if (!ap_n) { why_to(ap_why, ap_cache_near?"no locations within 50 km":"no locations in region"); goto done; }
     {
         unsigned k = ap_rand(ap_n);
         if(ap_n>1 && ap_locs[k].id==ap_last) k=(k+1u)%ap_n;
@@ -135,7 +139,7 @@ done:
     __asm__ volatile("" ::: "memory");
     ap_state = err ? AP_ERROR : AP_DONE;
 }
-int ap_start(uint16_t region)
+static int ap_begin(uint16_t region,int near,int32_t lat,int32_t lon)
 {
     if (ap_state == AP_BUSY || radio_net_running() || tls_taken) return -1;
     if(!ap_locs) {
@@ -144,15 +148,18 @@ int ap_start(uint16_t region)
         ap_world_locs=ap_locs+32;
     }
     if(region>=ap_region_total()) return -1;
+    if(near && (lat < -900000 || lat > 900000 || lon < -1800000 || lon > 1800000)) return -1;
     if(region && !ap_regions_ready()) {why_to(ap_why,"no region memory");return -1;}
-    if(region!=ap_cache_region) {
-        if(!ap_cache_region) {memcpy(ap_world_locs,ap_locs,32u*sizeof *ap_locs);ap_world_n=ap_n;}
+    if(region!=ap_cache_region || near!=ap_cache_near || (near && (lat!=ap_cache_lat || lon!=ap_cache_lon))) {
+        if(!ap_cache_region && !ap_cache_near) {memcpy(ap_world_locs,ap_locs,32u*sizeof *ap_locs);ap_world_n=ap_n;}
         ap_n=0;
-        if(!region) {memcpy(ap_locs,ap_world_locs,32u*sizeof *ap_locs);ap_n=ap_world_n;ap_world_n=0;}
-        ap_cache_region=region;
+        if(!region && !near) {memcpy(ap_locs,ap_world_locs,32u*sizeof *ap_locs);ap_n=ap_world_n;ap_world_n=0;}
+        ap_cache_region=region;ap_cache_near=(uint8_t)near;ap_cache_lat=lat;ap_cache_lon=lon;
     }
     if (!ap_rng) { radio_entropy((uint8_t *)&ap_rng, sizeof ap_rng); if (!ap_rng) ap_rng = 0xA90832u; }
     ap_why[0] = 0; ap_bytes = 0; ap_state = AP_BUSY;
     if (task_create(ap_task, 0, "aporee")) { why_to(ap_why, "no Aporee task"); ap_state = AP_ERROR; return -1; }
     return 0;
 }
+int ap_start(uint16_t region) {return ap_begin(region,0,0,0);}
+int ap_start_near(int32_t lat,int32_t lon) {return ap_begin(0,1,lat,lon);}

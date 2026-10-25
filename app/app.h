@@ -8,6 +8,12 @@
 #include "plat.h"
 
 #define APP_NAME "FIELD"
+#define APP_SPLASH
+void app_splash(void);
+#ifdef PLAT_HOST
+#define APP_HOST_CMD
+int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d);
+#endif
 #define APP_SPLASH_RGB RGB(48, 78, 56)
 #define APP_BLOCK 256u
 #define APP_CANVAS_PX (240u * 44u)       /* strips, including the 42-row password keyboard */

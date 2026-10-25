@@ -51,8 +51,23 @@ static unsigned ap_test_globe_draws;
 #endif
 static int sel_valid(void) { return 1; }
 static void ap_remember(void) { rset.playing = radio_want; rset_save(); }
+static void ap_near_toggle(void)
+{
+    uint8_t was=rset.rsv;int32_t lat=rset.near_lat,lon=rset.near_lon;
+    if(!was && (!play_url[0] || ap_pending || ap_fetching)) {ap_fav_notice(4);return;}
+    rset.rsv=was?0:1;
+    if(rset.rsv) {rset.near_lat=ap_now.lat;rset.near_lon=ap_now.lon;}
+    if(plat_store_save(OBJ_RADIO,&rset,sizeof rset)) {
+        rset.rsv=was;rset.near_lat=lat;rset.near_lon=lon;ap_fav_notice(5);
+    }
+}
+static void ap_near_leave(void)
+{
+    if(rset.rsv) {rset.rsv=0;rset_save();}
+}
 static void ap_shuffle(void)
 {
+    sam_finish();
     ap_recalled=0;
     ap_pending = 1; ap_retry = plat_ms(); radio_want = 1;
     if (wifi_st == WS_OFF) wifi_power(1);
@@ -62,7 +77,7 @@ static void sel_turn(int level, int32_t d) { if (level == 3 && d) ap_shuffle(); 
 static void radio_toggle(void)
 {
     radio_want = !radio_want;
-    if (!radio_want) radio_stop();
+    if (!radio_want) {sam_finish();radio_stop();}
     else { if (wifi_st == WS_OFF) wifi_power(1); if (!play_url[0]) ap_pending = 1; }
     ap_remember();
 }
@@ -82,7 +97,9 @@ static void radio_ui_service(void)
     }
     if (radio_want && ap_pending && !ap_fetching && wifi_st == WS_CONNECTED && (int32_t)(now-ap_retry) >= 0) {
         if (radio_st != RS_OFF) radio_stop();
-        if (!radio_net_running() && ap_start(ap_active_region) == 0) { ap_fetching = 1; ap_pending = 0; }
+        if (!radio_net_running() && (rset.rsv?ap_start_near(rset.near_lat,rset.near_lon):ap_start(ap_active_region)) == 0) {
+            ap_fetching = 1; ap_pending = 0;
+        }
     }
     if (radio_want && play_url[0] && !ap_fetching && !ap_pending && wifi_st == WS_CONNECTED &&
         !radio_net_running() && (int32_t)(now-ap_play_at) >= 0 &&
@@ -215,8 +232,8 @@ static void ui_home(void)
         snprintf(buffering,sizeof buffering,"Buffering %u%%",(unsigned)(percent>100?100:percent));
         status=buffering;
     }
-    ui_title(0,"FIELD",wifi_st==WS_CONNECTED?"WiFi":"GLO WiFi");
-    ap_left(0,ap_info?"RECORDING":ap_recalled?"FAVORITE":ap_active_region?ap_region_name(ap_active_region):"WORLD / RANDOM",K_TEAL);
+    ui_title(0,"FIELD",rset.rsv?"Near":wifi_st==WS_CONNECTED?"WiFi":"GLO WiFi");
+    ap_left(0,ap_info?"RECORDING":ap_recalled?"FAVORITE":rset.rsv?"NEAR / 50 KM":ap_active_region?ap_region_name(ap_active_region):"WORLD / RANDOM",K_TEAL);
     ap_left(1,ap_info?ap_now.artist:ap_now.place,K_TEXT);
     ap_left(2,ap_now.title[0]?ap_now.title:"Field recordings",K_TEXT);
     if(ap_info) ap_left(3,ap_now.licence,K_DIM);
@@ -309,6 +326,7 @@ static void ap_fav_input(uint32_t down,int32_t turn)
 }
 static void ap_regions_play(void)
 {
+    ap_near_leave();
     ap_active_region=ap_browse_region((unsigned)ap_browse_cursor);
     ap_info=0;ap_shuffle();ui_page_set(ap_player_page());
 }
@@ -335,14 +353,14 @@ static void ap_regions_input(uint32_t down,int32_t turn)
 }
 static void ui_help(void)
 {
-    ui_title(0,"Controls","");
+    ui_title(0,"Controls","MASTER volume");
     ui_row(1,38,21,"OCT- / OCT+","random sound",K_TEXT,K_TEAL,K_BG);
     ui_row(2,59,21,"PLAY","play / stop",K_TEXT,K_DIM,K_BG);
     ui_row(3,80,21,"GLO","WiFi setup",K_TEXT,K_DIM,K_BG);
     ui_row(4,101,21,"SEL","credits / details",K_TEXT,K_DIM,K_BG);
-    ui_row(5,122,21,"MASTER / keys","volume / FX",K_TEXT,K_DIM,K_BG);
-    ui_row(6,143,21,"REC","save favorite",K_TEXT,K_DIM,K_BG);
-    ui_row(7,164,21,"SEQ","favorites list",K_TEXT,K_DIM,K_BG);
+    ui_row(5,122,21,"EDIT","Near / 50 km",K_TEXT,K_DIM,K_BG);
+    ui_row(6,143,21,"REC / SEQ","save / favorites",K_TEXT,K_DIM,K_BG);
+    ui_row(7,164,21,"ARP / ENV","sampler / FX",K_TEXT,K_DIM,K_BG);
     ui_row(8,185,21,"SAVE","browse regions",K_TEXT,K_DIM,K_BG);
     ui_row(13,214,26,"Release HOME","",K_DIM,K_DIM,K_PANEL);
 }
