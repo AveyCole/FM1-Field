@@ -117,7 +117,7 @@ ip4_route2(src, dest)
 /*---------- TCP options ----------*/
 #define TCP_QUEUE_OOSEQ         1
 #define TCP_MSS                 (NETIF_MTU - 40)	/* TCP_MSS = (Ethernet MTU - IP header size - TCP header size) */
-#define TCP_WND                 (6*TCP_MSS)        /* FM-1: 2 segments capped a 128 kbit/s stream at ~98 over a 165 ms RTT */
+#define TCP_WND                 (12*TCP_MSS)       /* FIELD: 7.2 KB / 200 ms only permits 288 kbps; keep four of the existing 16 pbufs spare */
 #define TCP_SND_BUF             (2*TCP_MSS)
 #define TCP_SND_QUEUELEN        ((4 * (TCP_SND_BUF) + (TCP_MSS - 1))/(TCP_MSS))
 #define TCP_LISTEN_BACKLOG       0

@@ -1,0 +1,4 @@
+# Same model with the previous six-segment window (7200 bytes / 200 ms).
+# Its 288 kbps cap cannot sustain a 320 kbps recording.
+wait 26000
+expect ap_refills >0

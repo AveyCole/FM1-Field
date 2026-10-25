@@ -980,6 +980,7 @@ static unsigned host_pick;
 static FILE *host_stream;
 static uint8_t *host_ring;
 static uint32_t host_ring_size, host_stream_t0, host_stream_tick;
+static uint32_t host_window_tick, host_window_used;
 static void host_net_poll(void)
 {
     uint32_t now=plat_ms(),room,n,at,elapsed;
@@ -990,9 +991,20 @@ static void host_net_poll(void)
     if(stall && elapsed>=5000u && elapsed<5000u+(uint32_t)atoi(stall)) return;
     room=host_ring_size-(radio_wr-radio_rd);at=radio_wr%host_ring_size;
     n=host_ring_size-at;if(n>room)n=room;if(n>48u)n=48u;
+    { /* Optional window/RTT model: regression for a bandwidth-delay cap. This
+       * does not simulate lwIP, retransmits, or actual WiFi/TLS performance. */
+        const char *window=getenv("APOREE_TEST_WINDOW"), *rtt=getenv("APOREE_TEST_RTT");
+        if(window && rtt) {
+            uint32_t bytes=(uint32_t)atoi(window), ms=(uint32_t)atoi(rtt);
+            if(ms && now-host_window_tick>=ms) {host_window_tick=now;host_window_used=0;}
+            if(host_window_used>=bytes) return;
+            if(n>bytes-host_window_used)n=bytes-host_window_used;
+        }
+    }
     if(n) {
         unsigned got=(unsigned)fread(host_ring+at,1,n,host_stream);
         radio_wr+=got;
+        host_window_used+=got;
         if(!got) {fclose(host_stream);host_stream=0;radio_net_state=RN_ENDED;}
     }
 }
@@ -1015,7 +1027,7 @@ int radio_net_start(const char *u,uint8_t *b,uint32_t n) {
         host_stream=fopen(stream,"rb");
         if(host_stream) {
             host_ring=b;host_ring_size=n;radio_rd=radio_wr=0;
-            host_stream_t0=host_stream_tick=plat_ms();radio_net_state=RN_STREAMING;return 0;
+            host_stream_t0=host_stream_tick=host_window_tick=plat_ms();host_window_used=0;radio_net_state=RN_STREAMING;return 0;
         }
     }
     if(fixture) {

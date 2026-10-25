@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.3-alpha
+# FIELD — experimental 0.1.4-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -123,7 +123,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.3-alpha
+  python3 base/tools/build.py app --release 0.1.4-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -184,3 +184,29 @@ Run `node tests/usb_handoff_test.mjs` for the simulated firmware-to-loader-to-fi
 transition that requires old handles to close before re-enumeration. It also checks
 stale endpoints, partial-open failures and event-listener cleanup. Physical USB
 behavior still depends on the browser and host driver and needs a device test.
+
+## Network throughput and reserve (0.1.4)
+
+The user confirmed the screen displays Buffering during cutouts, indicating
+compressed-input starvation. The inherited 6-segment TCP receive window was
+7,200 bytes (MTU 1,240; MSS 1,200). Its window/RTT ceiling at 200 ms is only
+288 kbps, below a 320 kbps MP3. The window is now 12 segments / 14,400 bytes.
+The existing 16-pbuf pool is unchanged, leaving four buffers beyond a full
+window. This changes the amount of in-flight TCP data, not the audio ring size.
+
+Startup and refill now wait for 77,824 compressed bytes, rather than estimating
+2–3 seconds from the current MP3 frame's bitrate. This uses the existing 80 KiB
+ring, handles VBR more conservatively and gives about 4.9 seconds at 128 kbps or
+1.9 seconds at 320 kbps. Short completed files still start without filling it.
+Expect a longer initial wait on low-bitrate recordings.
+
+A host bandwidth-delay model (48 KB/s link, 200 ms round trip, 320 kbps MP3)
+reproduces a refill with the old window and no refill over 26 simulated seconds
+with the new window. This is not a real TCP, retransmission or WiFi simulation,
+and does not establish actual hardware throughput or guarantee zero buffering.
+The seven-second outage still pauses once and resumes the same recording.
+Real FM-1 playback on the user's connection remains to be tested.
+
+Hardware build: image 576592 B; RAM .data+.bss 130496 B of 131072; pool 308880 B of 311296. RAM and pool allocation are unchanged from 0.1.3;
+image, memory headroom and register-access checks pass. USB identity remains
+FIELD; package identity is `FM-1_84000104`. The browser USB handoff fix is retained.

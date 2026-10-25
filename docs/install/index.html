@@ -59,7 +59,7 @@
 <body>
 <main>
   <button type="button" class="lang" id="lang" lang="ja">日本語</button>
-  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Playback scheduling & battery · 0.1.3-alpha</strong><br>HTTPS processing now yields regularly to the audio decoder, reducing a cause of cutouts despite buffered data. Includes a three-bar battery indicator (USB when host-powered), country/state browsing and the static globe. This update passes software tests and still needs device testing. First WiFi startup downloads the location index and may take three minutes or longer. Back up your existing firmware’s projects using its own backup tools first.</p>
+  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Network throughput & playback reserve · 0.1.4-alpha</strong><br>The TCP receive window is doubled to improve throughput on delayed connections. Playback starts and refills with nearly the full existing audio reserve; startup may take longer. Includes a three-bar battery indicator (USB when host-powered), country/state browsing and the static globe. This update passes software tests and still needs device testing. First WiFi startup downloads the location index and may take three minutes or longer. Back up your existing firmware’s projects using its own backup tools first.</p>
   <p data-t="intro">Connect the FM-1 by USB, then press Install. It works in Chrome or Edge; the browser asks once to allow MIDI: allow it.</p>
   <p data-t="warn">Do not unplug the USB cable while writing.</p>
   <p class="small" data-t="direct"></p>
@@ -114,6 +114,6 @@
     Fonts: Barlow Semi Condensed (SIL OFL 1.1). M-VAVE and FM-1 are trademarks of their respective owners.<br>
     <span data-t="license"></span> <a href="https://github.com/AveyCole/FM1-Field" target="_blank" rel="noopener">FIELD source on GitHub<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
 </footer>
-<script type="module" src="../flasher.js?v=usb-handoff-1"></script>
+<script type="module" src="../flasher.js?v=0.1.4-usb-handoff-1"></script>
 </body>
 </html>

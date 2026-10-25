@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.3-alpha](docs/firmware/field-0.1.3-alpha.fwsc)**
+[Download 0.1.4-alpha](docs/firmware/field-0.1.4-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.3 update addresses decoder starvation during HTTPS downloads and adds a battery indicator. Software checks pass; this build still needs physical-device testing.
+The 0.1.4 update doubles the TCP receive window and uses nearly the full audio reserve at startup/refill. It retains the decoder scheduling fix, battery indicator and updated USB flasher. Software checks pass; this build still needs physical-device testing.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
@@ -52,10 +52,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.3-alpha
+  python3 base/tools/build.py app --release 0.1.4-alpha
 ```
 
-This produces `app/build/field-0.1.3-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.4-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

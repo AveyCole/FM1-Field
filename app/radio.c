@@ -107,15 +107,11 @@ static int dec_use(void)
     if (!mp3 || !pcm_tmp) { dec_drop(); return -1; }
     mp3dec_init(mp3); dec_kind = 1; return 0;
 }
-/* Buffer about 2 seconds initially, 3 after a real network underrun, capped
- * below the ring's capacity so startup cannot deadlock on a full producer. */
+/* Use the reserve already allocated, including for VBR files whose first frame
+ * understates later demand. Leave room for the producer and decoder window. */
 static uint32_t radio_buffer_target(void)
 {
-    uint32_t kbps = radio_kbps ? radio_kbps : 192u;
-    uint32_t target = kbps * (radio_rebuffers ? 375u : 250u);
-    if (target < 12u*1024u) target = 12u*1024u;
-    if (target > NET_RING - 4096u) target = NET_RING - 4096u;
-    return target;
+    return NET_RING - 4096u;
 }
 
 static int radio_alloc(void)

@@ -1,0 +1,6 @@
+# 320 kbps MP3, 48 KB/s link with a 200 ms window/RTT throughput cap.
+# This is a bandwidth-delay model, not a real TCP or RF simulation.
+wait 26000
+expect ap_playing 1
+expect ap_refills 0
+expect ap_lat 525200
