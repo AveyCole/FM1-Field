@@ -1,0 +1,111 @@
+wait 6000
+expect tempo_bpm 120
+press FX
+wait 300
+expect page 0
+release FX
+expect page 0
+wait 2000
+press FX
+release FX
+wait 496
+press FX
+release FX
+expect tempo_bpm 120
+press FX
+wait 447
+expect page 0
+wait 2
+expect page 11
+release FX
+expect tempo_bpm 120
+tap HOME
+tap ARP
+tap REC
+wait 3000
+tap SAVE
+tap HOME
+press FX
+wait 500
+expect page 11
+expect space_active 1
+expect sam_state 0
+expect tempo_bpm 120
+release FX
+expect page 11
+turn PRESET 10
+expect tempo_bpm 130
+turn K1 -8
+turn K2 10
+turn K3 10
+turn K4 10
+expect space_mix 65
+shot field-space-sync.png
+tap EDIT
+expect space_sync 0
+shot field-space-free.png
+tap PLAY
+expect ap_playing 0
+peakreset
+wait 300
+expect peak_db_min -100
+wait 3000
+peakreset
+wait 200
+expect peak_db_max -80
+tap PLAY
+wait 3000
+expect ap_playing 1
+turn ALGO -1
+expect space_on 0
+turn ALGO 1
+expect space_on 1
+tap HOME
+expect page 0
+expect space_active 1
+tap OCT+
+wait 400
+expect space_active 1
+expect ap_sound 2
+tap ARP
+expect space_active 0
+expect sam_state 2
+expect sam_len 21824
+tap HOME
+press FX
+wait 500
+release FX
+expect space_active 1
+tap ENV
+expect page 9
+expect space_active 0
+expect fx_mode 1
+turn PRESET -10
+expect tempo_bpm 120
+tap FX
+tap HOME
+press FX
+wait 500
+release FX
+expect page 11
+expect fx_mode 0
+expect space_active 1
+screen on space.syx
+wait 3000
+fbdump space.rgb
+screen off
+spin PRESET 300
+expect tempo_bpm 240
+spin PRESET -300
+expect tempo_bpm 40
+spin PRESET 80
+expect tempo_bpm 120
+tap HOME
+press FX
+wait 100
+tap GLO
+expect page 2
+release FX
+wait 500
+expect page 2
+expect tempo_bpm 120

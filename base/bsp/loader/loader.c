@@ -117,7 +117,7 @@ void ldr_main(void)
                 fm1_delay_ms(200);                  /* the "success" reply leaves */
                 usb_detach();
                 fm1_delay_ms(30);
-                fm1_core_reset();                   /* the SPL boots the new app */
+                fm1_reboot();                       /* reset peripherals before the SPL boots the new app */
             }
             /* Failed sessions return here only after flash/transport work
              * has stopped. Start a fresh idle grace period before retrying. */

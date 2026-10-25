@@ -8,6 +8,9 @@
 #include "plat.h"
 
 #define APP_NAME "FIELD"
+/* The target package may carry stock or third-party startup code. Reset the
+ * peripherals too; OTA has already verified its power-loss-safe flash record. */
+#define FM1_UPDATE_REBOOT fm1_reboot
 #define APP_SCREEN_STREAM
 void app_screen_blit(uint32_t x,uint32_t y,uint32_t w,uint32_t h,const uint16_t *pixels);
 void app_screen_fill(uint32_t x,uint32_t y,uint32_t w,uint32_t h,uint16_t color);

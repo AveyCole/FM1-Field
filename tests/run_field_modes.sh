@@ -9,6 +9,8 @@ cc -O1 -Wall -Wno-unused-function -Ibase/include tests/sample_store_test.c -lm -
 app/build/tests/sample_store_test
 cc -O1 -Wall -Wno-unused-function -Ibase/include tests/filter_test.c -lm -o app/build/tests/filter_test
 app/build/tests/filter_test
+cc -O1 -Wall -Wno-unused-function -Ibase/include tests/space_test.c -lm -o app/build/tests/space_test
+app/build/tests/space_test
 cc -O1 tests/loader_link_test.c -o app/build/tests/loader_link_test
 app/build/tests/loader_link_test
 "${PYTHON:-python3}" base/tools/build.py app --host
@@ -21,6 +23,7 @@ if [ -n "${APOREE_TEST_STREAM:-}" ]; then
     app/build/host/field_host tests/field_filter.host app/build/tests
     app/build/host/field_host tests/field_sampler_audio.host app/build/tests
     app/build/host/field_host tests/field_sample_save.host app/build/tests
+    app/build/host/field_host tests/field_space.host app/build/tests
     app/build/host/field_host tests/field_display.host app/build/tests
     if command -v node >/dev/null 2>&1; then
         node tests/screen_stream_test.mjs

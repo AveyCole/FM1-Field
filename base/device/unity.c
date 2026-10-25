@@ -198,6 +198,7 @@ static void ota_show(uint32_t step, int32_t code)
 static void radio_clean_exit(void);
 static void ota_commit(const uint8_t *parm)
 {
+    fm1_audio_stop();                                    /* no audio DMA survives into another firmware's loader */
     radio_clean_exit();                                   /* an update, not a crash: Bluetooth starts again after it */
     bootguard.pending = 0;                              /* intentional reset */
     bootguard.failed = 0;                               /* a new install starts with a clean slate */

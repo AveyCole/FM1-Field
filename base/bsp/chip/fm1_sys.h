@@ -248,6 +248,9 @@ FM1_INLINE void fm1_core_reset(void)
         ;
 }
 
+#ifndef FM1_UPDATE_REBOOT
+#define FM1_UPDATE_REBOOT fm1_core_reset
+#endif
 FM1_INLINE void fm1_enter_update(const uint8_t *parm)
 {
     uint32_t i;
@@ -258,7 +261,8 @@ FM1_INLINE void fm1_enter_update(const uint8_t *parm)
     *(volatile uint32_t *)0x1EEE348u = 0;
     for (i = 0; i < FM1_UPDATA_PARM_LEN; i++)
         FM1_UPDATA_PARM[i] = parm[i];
-    fm1_core_reset();
+    __asm__ volatile("csync" ::: "memory");
+    FM1_UPDATE_REBOOT();
 }
 
 FM1_INLINE void fm1_updata_parm_clear(void)

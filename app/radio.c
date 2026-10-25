@@ -500,6 +500,7 @@ static void fx_process(float *l, float *r)
     }
 }
 
+#include "field_space.c"
 #include "field_filter.c"
 /* the audio interrupt's: n frames into o (24-bit in 32, stereo) */
 static void radio_render(int32_t *o, uint32_t n)
@@ -529,6 +530,7 @@ static void radio_render(int32_t *o, uint32_t n)
         }
         sam_capture(l,rr,fresh);
         if(playing && fx_mode) fx_process(&l,&rr);
+        if(space_active) space_process(&l,&rr);
         sam_monitor(&l,&rr);                     /* monitoring only: capture still receives the live source */
 
         {   /* Keep the live recording audible on every sampler/player page. */

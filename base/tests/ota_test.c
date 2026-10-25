@@ -200,7 +200,9 @@ int main(int argc, char **argv)
     rc = ota_session();
     printf("  %u requests\n", requests);
     bad += check("session commits", rc == 0 && committed);
-    bad += check("headers + loader + confirm, no head reads", requests >= 10 && requests <= 30);
+    /* Stock installers also validate the boot area and have a larger loader.
+     * Bound the transfer for either package, rather than assuming FIELD's size. */
+    bad += check("bounded headers + loader + confirmation", requests >= 10 && requests <= 128);
     {
         uint8_t *h = nor + 0xE0000, *p = committed_parm;
         bad += check("staged body == the package's loader", !memcmp(nor + 0xE0020, logical + ota_body_off(), 64));

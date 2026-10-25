@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.10-alpha](docs/firmware/field-0.1.10-alpha.fwsc)**
+[Download 0.1.11-alpha](docs/firmware/field-0.1.11-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.10 update adds one saved sample slot on SAVE in ARP, preserving the clip and its edit settings across power cycles. Software checks pass; physical-device testing is still needed.
+The 0.1.11 update adds Echo + Room behind a home-screen FX hold, keeps short taps for tempo, and adds BPM on PRESETS in both FX pages. It also stops audio and uses a full-chip reset for update handoff and loader completion to address firmware-switch restart failures. Software checks pass; physical-device testing is still needed. The first install from older FIELD may still need a power-cycle if its old handoff stalls.
 Back up your existing firmware's projects before installing. The installer includes
 stock-firmware restore and crash-report controls. Use desktop Chrome or Edge with
 the FM-1 connected directly by a USB data cable.
@@ -42,7 +42,8 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | PRESETS in ARP Slice | Select 4, 8, 16 or 27 equal slices of the trimmed clip; fewer slices are longer |
 | LFO | Open the filter page; press again or HOME to return to the player |
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
-| FX | Tap tempo on any page; ENV displays BPM and the FX light marks the beat |
+| FX | Short tap sets tempo; hold 450 ms on HOME or the regional player to open Echo + Room |
+| PRESETS on either FX page | Set the shared BPM, 40–240; header displays it |
 | ENV | Separate live-effects mode; clears the sample to reuse its buffer. ENV / HOME returns |
 | EDIT | Toggle Near on the player; fixed 50 km neighborhood with a visible Near indicator |
 
@@ -110,6 +111,29 @@ needs a small amount of state and shares no sample/FX audio memory.
 
 ![FIELD river filter](docs/images/field-filter.png)
 
+Hold FX on the home screen (including the regional player) for 450 ms to open
+**Echo + Room**. A shorter press is still a tempo tap, timed from the press
+rather than release. A hold does not add a tempo tap. Other pages retain tap
+tempo. PRESETS adjusts the shared BPM on both Echo + Room and ENV's FX page;
+turning it clears the old tap history before a new tapping sequence.
+
+K1 sets delay time, K2 feedback, K3 room decay, and K4/SELECT wet mix. EDIT toggles
+free delay (20–360 ms) and tempo sync (1/8, 1/4, 1/2 or 1 beat). The actual delay
+time is displayed; synced values exceeding 360 ms are limited and marked
+`SYNC / LIMIT`. ALGORITHM left bypasses, right enables. HOME returns to the
+player while the combo continues. FX still taps tempo on the combo page.
+Tails continue after stopping the source and decay naturally. The dry stereo
+audio stays full rate; the warm echo/room path runs at 11.025 kHz.
+
+The combo exclusively reuses the same 12 KiB as the sampler/held-key FX. Entering
+it clears an unsaved clip. SAVE in ARP first to keep a clip; opening ARP restores
+that saved version and clears the combo's tail. ENV also clears its tail and
+opens the original FX. These modes cannot run simultaneously. The independent
+LFO filter can still process the combo output. OCT continues to skip in place,
+REC/SEQ keep their favorites functions, and GLO opens WiFi.
+
+![FIELD Echo + Room](docs/images/field-space.png)
+
 Near is anchored when EDIT enables it and survives power-off. It does not drift
 with each skip. Its first selection scans the location index, potentially taking
 three minutes or longer; later skips use the nearby cache. EDIT disables it;
@@ -138,10 +162,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.10-alpha
+  python3 base/tools/build.py app --release 0.1.11-alpha
 ```
 
-This produces `app/build/field-0.1.10-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.11-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

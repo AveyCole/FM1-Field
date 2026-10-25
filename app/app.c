@@ -172,9 +172,9 @@ static void tempo_set(uint32_t beat_ms, uint32_t t0)
     tempo_t0 = t0;
     tempo_shown_until = plat_ms() + 2000u;
 }
-static void tempo_tap(void)
+static void tempo_tap(uint32_t now)
 {
-    uint32_t now = plat_ms(), n;
+    uint32_t n;
     if (tap_n && now - tap_t[(tap_n - 1u) % 4u] > 2000u)
         tap_n = 0;                                /* a pause: a new count */
     tap_t[tap_n % 4u] = now;
@@ -199,7 +199,7 @@ static void tempo_tap(void)
 #define K_TEAL RGB(160, 187, 125)
 #include "field_splash.c"
 
-enum { PG_HOME, PG_BROWSE, PG_WIFI, PG_NETS, PG_PASS, PG_HELP, PG_SYNTH, PG_FAV, PG_REGION, PG_EFFECTS, PG_FILTER };
+enum { PG_HOME, PG_BROWSE, PG_WIFI, PG_NETS, PG_PASS, PG_HELP, PG_SYNTH, PG_FAV, PG_REGION, PG_EFFECTS, PG_FILTER, PG_SPACE };
 static uint8_t ui_page, ui_dirty = 1;
 static int ui_sel, ui_top;
 static uint32_t ui_scan_t;                        /* the scan asked for (ms), 0 = none waiting */
@@ -449,12 +449,14 @@ static uint32_t sam_keys;
 static int8_t sam_key=-1;
 static void sampler_open(void)
 {
+    space_active=0;
     if(sam_state==SAM_EMPTY) {fx_mode=0;fx_held=fx_wire=0;(void)sam_restore();}
     sam_enter();
 }
 static void effects_open(void)
 {
     int had_sample=sam_state!=SAM_EMPTY;
+    space_active=0;
     sam_voice=sam_gate=0;sam_state=SAM_EMPTY;sam_len=0;
     sam_active=0;sam_keys=0;
     if(fx_hist) memset(fx_hist,0,FX_HIST*sizeof *fx_hist);
@@ -473,7 +475,7 @@ static void ui_effects(void)
     ui_row(4,118,24,"Keys 9-12","tape / reverse / chop",K_TEXT,K_DIM,K_BG);
     ui_row(5,142,24,"Keys 13-16","ring / half / mute / lo-fi",K_TEXT,K_DIM,K_BG);
     ui_piano(6,174,-1,plat_keys());
-    ui_row(13,214,26,"FX tap tempo","ENV back",K_DIM,K_DIM,K_PANEL);
+    ui_row(13,214,26,"FX tap  PRESETS BPM","ENV back",K_DIM,K_DIM,K_PANEL);
 }
 static int sam_knob(volatile uint8_t *v,int32_t d)
 {
@@ -520,6 +522,30 @@ static void ui_filter(void)
     ui_row(13,214,26,"SEL type  EDIT sync","LFO back",K_DIM,K_DIM,K_PANEL);
 }
 
+static void space_open(void)
+{
+    if(!fx_hist) {ap_fav_notice(7);return;}
+    if(!space_active) {
+        fx_mode=0;fx_held=fx_wire=0;sam_voice=sam_gate=sam_active=0;sam_state=SAM_EMPTY;sam_len=0;
+        memset(fx_hist,0,FX_HIST*sizeof *fx_hist);space_reset();space_on=space_active=1;
+    }
+    ui_page_set(PG_SPACE);
+}
+static void ui_space(void)
+{
+    static const char *const labels[]={"K1 DELAY","K2 FEED","K3 ROOM","K4 MIX"};
+    char a[16],b[16],c[16],d[16],bpm[16];
+    snprintf(bpm,sizeof bpm,"%u BPM",(unsigned)tempo_bpm);ui_title(0,"Echo + Room",bpm);
+    ui_row(1,42,24,"ALGO",space_on?"ON":"BYPASS",K_DIM,K_CORAL,K_BG);
+    ui_row(4,68,20,"PRESETS BPM",space_sync?space_wanted()>3969?"SYNC / LIMIT":"SYNC":"FREE",K_DIM,K_TEAL,K_BG);
+    snprintf(a,sizeof a,"%ums",space_frames()*1000u/11025u);
+    snprintf(b,sizeof b,"%u%%",(unsigned)space_feedback*100u/127u);
+    snprintf(c,sizeof c,"%u%%",(unsigned)space_room*100u/127u);
+    snprintf(d,sizeof d,"%u%%",(unsigned)space_mix*100u/127u);
+    ui_landscape(1);ui_knobs(labels,a,b,c,d);
+    ui_row(13,214,26,"EDIT sync  FX tap","HOME back",K_DIM,K_DIM,K_PANEL);
+}
+
 static void ui_draw(void)
 {
     if (ui_dirty) {
@@ -541,6 +567,7 @@ static void ui_draw(void)
     case PG_SYNTH: ui_sampler(); break;
     case PG_EFFECTS: ui_effects(); break;
     case PG_FILTER: ui_filter(); break;
+    case PG_SPACE: ui_space(); break;
     default: ui_help(); break;
     }
 }
@@ -679,6 +706,7 @@ void app_init(void)
     sam_init(fx_hist);
     (void)sam_restore();
     fil_init();
+    space_active=0;space_reset();
     fx_mode=0;fx_held=0;
     rset_load();
 }
@@ -711,14 +739,28 @@ void app_ui_init(void)
 }
 
 static uint32_t btn_prev;
+static uint32_t fx_press_ms;
+static uint8_t fx_pending;
 static void input(void)
 {
-    uint32_t now = plat_buttons(), down = now & ~btn_prev;
+    uint32_t now = plat_buttons(), down = now & ~btn_prev, up=btn_prev&~now;
     int32_t turn = plat_enc(EN_SELECT);
     int32_t algo = plat_enc(EN_ALGO);
     int32_t presets = plat_enc(EN_PRESET);
     btn_prev = now;
-    if(down&(1u<<B_FX)) {tempo_tap();fil_restart=1;if(ui_page==PG_FILTER) fil_sync=1;}
+    if(ui_page!=PG_HOME && ui_page!=PG_REGION) fx_pending=0;
+    if(down&(1u<<B_FX)) {
+        if(ui_page==PG_HOME || ui_page==PG_REGION) {fx_pending=1;fx_press_ms=plat_ms();}
+        else {tempo_tap(plat_ms());fil_restart=1;if(ui_page==PG_FILTER) fil_sync=1;}
+    }
+    if(fx_pending) {
+        if((now&(1u<<B_FX)) && plat_ms()-fx_press_ms>=450u) {fx_pending=0;space_open();return;}
+        if(up&(1u<<B_FX)) {fx_pending=0;tempo_tap(fx_press_ms);fil_restart=1;}
+    }
+    if(presets && (ui_page==PG_EFFECTS || ui_page==PG_SPACE)) {
+        int bpm=(int)tempo_bpm+presets;bpm=bpm<40?40:bpm>240?240:bpm;
+        tempo_set((60000u+(unsigned)bpm/2u)/(unsigned)bpm,plat_ms());tap_n=0;fil_restart=1;
+    }
     if(down&(1u<<B_LFO)) {fil_seen=1;ui_page_set(ui_page==PG_FILTER?ap_player_page():PG_FILTER);return;}
     /* Local octave/layer controls take precedence; elsewhere these always
      * request another sound without changing the screen being used. */
@@ -883,6 +925,17 @@ static void input(void)
         if((down&(1u<<B_SEQ)) && ap_fav_open()) ui_page_set(PG_FAV);
         if(down&(1u<<B_ARP)) {sampler_open();ui_page_set(PG_SYNTH);}
         if(down&(1u<<B_ENV)) effects_open();
+    } else if(ui_page==PG_SPACE) {
+        if(algo) space_on=algo>0;
+        sam_knob(&space_time,plat_enc(EN_K1));sam_knob(&space_feedback,plat_enc(EN_K2));
+        sam_knob(&space_room,plat_enc(EN_K3));sam_knob(&space_mix,plat_enc(EN_K4)+turn);
+        if(down&(1u<<B_EDIT)) space_sync=!space_sync;
+        if(down&(1u<<B_PLAY)) radio_toggle();
+        if(down&(1u<<B_REC)) ap_fav_save();
+        if((down&(1u<<B_SEQ)) && ap_fav_open()) ui_page_set(PG_FAV);
+        if(down&(1u<<B_HOME)) ui_page_set(ap_player_page());
+        if(down&(1u<<B_ENV)) effects_open();
+        if(down&(1u<<B_ARP)) {sampler_open();ui_page_set(PG_SYNTH);}
     } else if(ui_page==PG_EFFECTS) {
         if(down&(1u<<B_REC)) ap_fav_save();
         if((down&(1u<<B_SEQ)) && ap_fav_open()) {ui_page_set(PG_FAV);return;}
@@ -921,6 +974,10 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"fil_depth")) *got=fil_depth;
     else if (!strcmp(what,"fil_rate")) *got=fil_rate;
     else if (!strcmp(what,"fil_sync")) *got=fil_sync;
+    else if (!strcmp(what,"space_active")) *got=space_active;
+    else if (!strcmp(what,"space_on")) *got=space_on;
+    else if (!strcmp(what,"space_sync")) *got=space_sync;
+    else if (!strcmp(what,"space_mix")) *got=space_mix;
     else if (!strcmp(what,"screen_bytes")) *got=sizeof(field_screen_t);
     else if (!strcmp(what,"screen_drops")) *got=screen?(int)screen->drops:0;
     else if (!strcmp(what, "page"))
@@ -1023,7 +1080,7 @@ static void lights(void)
         lb=1u<<B_ENV|1u<<B_HOME|1u<<B_ARP|1u<<B_PLAY|1u<<B_FX|1u<<B_GLO|1u<<B_REC|1u<<B_SEQ;
         lk=((1u<<NKEYS)-1u)&~plat_keys();
     }
-    if(ui_page==PG_FILTER) {
+    if(ui_page==PG_FILTER || ui_page==PG_SPACE) {
         lb=1u<<B_HOME|1u<<B_SEL|1u<<B_EDIT|1u<<B_PLAY|1u<<B_REC|1u<<B_SEQ|1u<<B_ARP|1u<<B_ENV;
         if(sam_state==SAM_READY) lk=((1u<<NKEYS)-1u)&~sam_keys;
     }

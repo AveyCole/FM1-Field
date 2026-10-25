@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.10-alpha
+# FIELD — experimental 0.1.11-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -125,7 +125,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.10-alpha
+  python3 base/tools/build.py app --release 0.1.11-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -485,3 +485,61 @@ tests seed both sample banks, including AT-like bytes, and verify preservation
 through install and reinstall. Existing sampler, monitor, filter, favorites,
 regions, pixel mirror, USB recovery, streaming crypto and scheduler checks pass.
 Build checks: image 578912 B; RAM .data+.bss 130688 B of 131072; pool 308884 B of 311296. Physical saving/reboot/playback still needs a device test.
+
+## Echo + Room, home FX hold and preset BPM (0.1.11)
+
+Hold FX on HOME/the regional player for 450 ms to open the independent combo
+page. A short press remains a tempo tap, registered on release using its press
+timestamp, so different press lengths do not skew the beat. A hold is consumed
+without a tap or release action. Leaving a player page cancels a pending hold.
+Other pages still tap on FX press. PRESETS on ENV's FX page and Echo + Room
+adjusts shared tempo from 40 to 240 BPM and clears old tap history.
+
+K1 delay time, K2 feedback, K3 room decay and K4/SELECT mix accompany the same
+static river artwork and compact readouts. EDIT toggles free 20–360 ms / synced
+1/8, 1/4, 1/2 and 1 beat; values exceeding the buffer's 360 ms working range are
+clamped and explicitly marked SYNC / LIMIT. Actual milliseconds and BPM are
+displayed. ALGORITHM bypasses/enables with a smooth wet-gain ramp. HOME leaves
+the combo running; PLAY stops/restarts the source with natural decaying tails.
+LFO can process the mixed output. OCT, REC/SEQ and GLO retain their functions.
+
+This uses the existing 6,144-int16 sample/FX bank: 4,096 echo samples, four
+damped combs of 293/337/421/463 samples and independent stereo allpasses of
+113/173 samples, totaling 5,896. The wet path runs at 11.025 kHz with input
+averaging and output smoothing; live dry stereo remains at 44.1 kHz. Echo time
+glides, echo feedback is bounded at 0.82, room feedback at 0.88, and writes and
+output are bounded. There are no new audio allocations or reduced network/PCM
+buffers. The combo, held-key FX and sampler are exclusive: entry clears an
+unsaved clip, ARP restores a saved clip, and entering ARP or ENV clears the tail.
+The saved flash slot is unaffected.
+
+Tests cover short, long and threshold holds, no tempo change on hold/release,
+accurate short-tap spacing, PRESETS BPM in both pages, parameter controls,
+bypass, navigation, source skip, sample preservation and memory ownership.
+DSP checks verify the quarter-second echo, stereo diffusion, decaying tails,
+16 control corners, exact bypass, buffer guards and tempo/limit behavior.
+Host audio confirms the tail continues with the source stopped and reaches
+silence. The viewer reconstructs every combo-screen pixel. Existing sampler,
+saved clip, filter, favorites, regions, USB updater, crypto and scheduler checks
+pass; the real loader simulation preserves the saved-sample banks. Build:
+image 581152 B; RAM .data+.bss 130752 B of 131072; pool 308884 B of 311296. Physical audio quality, timing and USB behavior still need device tests.
+
+
+## Restart when changing firmware (0.1.11)
+
+FIELD now stops audio DMA before detaching USB and entering the target update
+loader. Its handoff uses the existing P33 full-chip reset instead of a CPU-only
+reset, after the update record has been written and verified in flash. FIELD's
+own loader also uses a full-chip reset after completing an installation. This
+addresses retained peripheral state when switching firmware; a physical-device
+test is still needed to confirm the reported black-screen restart failure.
+Other firmware packages supply their own final loader/reset code.
+
+Software update-session checks pass for FIELD and the official stock package,
+including staged-loader integrity, flash/RAM update-record agreement, host
+confirmation and failed-transfer cleanup. FIELD loader simulation also passes
+install/reinstall and saved-sample preservation checks.
+
+The first install from an older FIELD version still begins with that version's
+old handoff code and may need a power-cycle if it stalls. Subsequent updates
+from 0.1.11 use the new handoff. Never interrupt an active flash write.
