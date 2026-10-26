@@ -60,7 +60,7 @@
 <body>
 <main>
   <button type="button" class="lang" id="lang" lang="ja">日本語</button>
-  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>USB audio sampling · 0.1.18-alpha</strong><br>0.1.18 adds USB audio sampling. In the sampler, press ENV to choose Radio or USB; the header identifies USB. On your computer, choose FIELD as the audio output at 44.1 kHz, 16-bit stereo, then play audio and press REC. Incoming stereo is captured as mono. USB works with Replace, Layer overdubs, all four quality settings and SAVE. SELECT sets live mix and ALGORITHM mutes monitoring without stopping capture. Source changes are locked during recording; leaving the editor restores radio monitoring. The display mirror and existing sample/stream buffers remain. Software tests pass; physical-device USB testing is still needed. Leave FIELD running normally and press Install. Back up your projects first.</p>
+  <h1>Install FIELD</h1><p style="border:1px solid currentColor;padding:12px;border-radius:8px"><strong>Live-mix overdub strength · 0.1.19-alpha</strong><br>0.1.19 makes SELECT’s live mix control overdub strength for Radio and USB. In Layer, 0% preserves the existing sample unchanged; 100% keeps the original 50/50 blend; intermediate values add a quieter layer while retaining more of the old sound. You can adjust it during recording. ALGORITHM remains a monitor-only mute, so quiet monitoring still permits overdubbing at the chosen mix. Replace capture stays independent of monitor level. USB sampling, saved location caches, all four sample lengths and the display mirror remain. Software tests pass; hardware testing is still needed. Leave FIELD running normally and press Install. Back up your projects first.</p>
   <p data-t="intro">Connect the FM-1 by USB, then press Install. It works in Chrome or Edge; the browser asks once to allow MIDI: allow it.</p>
   <p data-t="warn">Do not unplug the USB cable while writing.</p>
   <p class="small" data-t="direct"></p>
@@ -116,6 +116,6 @@
     Fonts: Barlow Semi Condensed (SIL OFL 1.1). M-VAVE and FM-1 are trademarks of their respective owners.<br>
     <span data-t="license"></span> <a href="https://github.com/AveyCole/FM1-Field" target="_blank" rel="noopener">FIELD source on GitHub<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
 </footer>
-<script type="module" src="../flasher.js?v=0.1.18-usb-capture-1"></script>
+<script type="module" src="../flasher.js?v=0.1.19-overdub-mix-1"></script>
 </body>
 </html>

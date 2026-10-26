@@ -11,7 +11,7 @@ static volatile uint8_t sam_active,sam_state,sam_voice,sam_gate;
 static volatile uint8_t sam_muted,sam_usb,sam_usb_ready;
 static uint8_t sam_quality=1,sam_rate_shift=1,sam_live_mix=127;
 static unsigned sam_rate(void) {return SAM_RATE>>sam_rate_shift;}
-static uint8_t sam_layer,sam_dubbing,sam_dub_fresh,sam_dub_block[SAM_BLOCK];
+static uint8_t sam_layer,sam_dubbing,sam_dub_fresh,sam_dub_changed,sam_dub_block[SAM_BLOCK];
 static uint32_t sam_dub_pos;
 static float sam_dub_old,sam_dub_monitor;
 static float sam_monitor_level=1;
@@ -97,7 +97,8 @@ static void sam_dub_flush(void)
 {
  unsigned used=sam_dub_pos%64u,i,block=(sam_dub_pos-1u)/64u;
  if(used) for(i=used;i<64;i++) sam_dub_put(i,sam_cache[i]);
- memcpy(sam_data+block*SAM_BLOCK,sam_dub_block,SAM_BLOCK);sam_cached=0xFFFFFFFFu;
+ if(sam_dub_changed) memcpy(sam_data+block*SAM_BLOCK,sam_dub_block,SAM_BLOCK);
+ sam_cached=0xFFFFFFFFu;
 }
 static void sam_finish(void)
 {
@@ -140,7 +141,12 @@ static void sam_capture(float l,float r,int fresh)
  if(sam_dubbing) {
   int old=sam_sample(pos),value=(int)(sam_sum*(32767.0f/(float)sam_div));
   sam_sum=0;sam_div=0;sam_dub_old=(float)old/32768.0f;
-  sam_dub_put(at,(old+value)/2);sam_dub_pos=pos+1u;
+  /* Live mix sets overdub strength: 0 preserves the old block, full
+   * retains the original 50/50 blend. Monitor mute remains independent. */
+  unsigned mix=sam_live_mix;
+  if(!at) sam_dub_changed=0;
+  if(mix) sam_dub_changed=1;
+  sam_dub_put(at,(old*(254-(int)mix)+value*(int)mix)/254);sam_dub_pos=pos+1u;
   if(at==63u || sam_dub_pos==sam_len) sam_dub_flush();
   if(sam_dub_pos==sam_len) {sam_dubbing=0;sam_state=SAM_READY;}
   return;

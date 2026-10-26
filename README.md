@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.18-alpha](docs/firmware/field-0.1.18-alpha.fwsc)**
+[Download 0.1.19-alpha](docs/firmware/field-0.1.19-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-0.1.18 adds USB audio sampling. In the sampler, press ENV to choose Radio or USB; the header identifies USB. On your computer, choose FIELD as the audio output at 44.1 kHz, 16-bit stereo, then play audio and press REC. Incoming stereo is captured as mono. USB works with Replace, Layer overdubs, all four quality settings and SAVE. SELECT sets live mix and ALGORITHM mutes monitoring without stopping capture. Source changes are locked during recording; leaving the editor restores radio monitoring. The display mirror and existing sample/stream buffers remain. Software tests pass; physical-device USB testing is still needed.
+0.1.19 makes SELECT’s live mix control overdub strength for Radio and USB. In Layer, 0% preserves the existing sample unchanged; 100% keeps the original 50/50 blend; intermediate values add a quieter layer while retaining more of the old sound. You can adjust it during recording. ALGORITHM remains a monitor-only mute, so quiet monitoring still permits overdubbing at the chosen mix. Replace capture stays independent of monitor level. USB sampling, saved location caches, all four sample lengths and the display mirror remain. Software tests pass; hardware testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -39,7 +39,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | PRESETS in ARP, outside Slice | Choose the next capture rate: 16 / 8 / 4 / 2 kHz, up to 2.7 / 5.5 / 10.9 / 21.8 seconds |
 | PRESETS in ARP Slice | Select 4, 8, 16 or 27 equal slices of the trimmed clip; fewer slices are longer |
 | LFO | Open the filter page; press again or HOME to return to the player |
-| SELECT in ARP | Continuous live monitor mix, 0–100%; K4 independently sets sample level, 0–200% |
+| SELECT in ARP | Live monitor mix and Layer overdub strength, 0–100%; K4 independently sets sample level, 0–200% |
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
 | FX | Tap tempo for the retained LFO filter |
 | PRESETS on LFO | Set BPM, 40–240; header displays it |
@@ -67,7 +67,7 @@ stop capture. A short fade avoids an abrupt gain change. Leaving the editor rest
 
 To capture **USB-C audio**, connect FIELD to a computer with a data cable and select **FIELD as the computer’s playback/output device** at **44.1 kHz, 16-bit stereo**. This uses USB device audio, not a USB-host connection to another USB peripheral. Send audio from the computer, open **ARP**, and press **ENV** until the header says **Sampler / USB**. Press **REC** to capture or **EDIT** for Layer, then REC to overdub. Stereo input is averaged to mono in the existing sample bank.
 
-USB capture works without WiFi. Incoming silence records normally; missing USB frames pause capture. The editor reports when USB audio is unavailable and refuses an empty start. Monitoring mix/mute does not affect capture. Source selection is locked while recording; stop with REC or SAVE before switching. Leaving the editor finishes capture and restores radio monitoring; the same sample remains playable on the keyboard. Source selection resets to Radio at boot; saved clips keep their audio and rate regardless of origin.
+USB capture works without WiFi. Incoming silence records normally; missing USB frames pause capture. The editor reports when USB audio is unavailable and refuses an empty start. Live mix also sets Layer overdub strength; ALGORITHM mute does not affect capture, and Replace ignores both monitor controls. Source selection is locked while recording; stop with REC or SAVE before switching. Leaving the editor finishes capture and restores radio monitoring; the same sample remains playable on the keyboard. Source selection resets to Radio at boot; saved clips keep their audio and rate regardless of origin.
 
 The USB receive ring adds 2 KiB of heap, reserved before WiFi allocations. No sample, compressed-stream or PCM buffer is reduced. The optional USB display mirror remains available with its existing low-memory guard. The computer can still record FIELD’s output over USB; avoid routing that return back into FIELD unless an audio feedback loop is intended.
 
@@ -107,7 +107,7 @@ pitch. Existing 8 kHz saved clips remain compatible. New clips need FIELD 0.1.17
 
 Press **EDIT in ARP** to select **LAYER**, then **REC** to overdub the live
 recording onto the existing clip. It makes one pass over the full original
-clip at its original speed, with a 50/50 blend for headroom. The old clip is
+clip at its original speed, with SELECT’s live mix controlling overdub strength: 0% keeps the old clip byte-for-byte; 100% blends old/new 50/50 for headroom. Intermediate settings add a quieter layer and retain more of the original. Adjustments apply during recording. ALGORITHM remains a monitor-only mute. The old clip is
 audible during the pass; keyboard audition resumes afterward. Trim, pitch,
 octave, slice and playback settings are retained. The clip's length stays the
 same at its recorded rate. Network buffering pauses capture.
@@ -180,10 +180,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.18-alpha
+  python3 base/tools/build.py app --release 0.1.19-alpha
 ```
 
-This produces `app/build/field-0.1.18-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.19-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

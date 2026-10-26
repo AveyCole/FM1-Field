@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.18-alpha
+# FIELD — experimental 0.1.19-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -124,7 +124,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.18-alpha
+  python3 base/tools/build.py app --release 0.1.19-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -775,3 +775,26 @@ source lock, USB overdub/SAVE/reboot and a full 21.824-second capture across a
 network track ending. All earlier sampler, cache, filter and pixel-mirror tests
 pass. Both inline installer pages validate the new package and identity.
 Hardware checks: image 576496 B; RAM .data+.bss 130976 B of 131072; pool 308772 B of 311296. Real-device USB testing remains necessary.
+
+
+## Live mix controls overdub strength (0.1.19)
+
+SELECT's live mix now also controls Layer recording from Radio or USB.
+For mix m in 0..127, the captured integer sample is
+(old * (254-m) + incoming * m) / 254. Full mix preserves the previous
+50/50 blend; zero retains the old sample; intermediate values progressively
+introduce the new source while keeping more of the existing clip. The knob
+is read at each captured sample, allowing adjustments during an overdub.
+ALGORITHM mute remains monitor-only. Replace capture remains dry and independent
+of both monitor controls. No buffer, sample-rate or flash format changes.
+
+A block touched only at zero mix is not written back, retaining its original
+ADPCM bytes exactly and avoiding generation loss. Mixed blocks still use the
+existing scratch block and commit only when complete; early stops preserve
+the untouched tail. One byte tracks whether a block has nonzero overdub mix.
+
+DSP tests check byte-exact zero-mix passes, intermediate/full blend levels,
+monitor-mute independence, partial final blocks and mid-block knob changes.
+All existing Radio/USB, overdub, save/recovery, Lo-fi, cache, filter, display
+mirror and inline installer checks pass. Hardware checks: image 576512 B; RAM .data+.bss 130976 B of 131072; pool 308772 B of 311296.
+Physical-device testing remains necessary.
