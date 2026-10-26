@@ -466,11 +466,11 @@ static void ui_sampler(void)
     static const char *const quality[]={"16k / 2.7s","8k / 5.5s","LO 4k / 10.9s","LO 2k / 21.8s"};
     char a[20],b[20],c[20],d[20],status[40],mode[16];
     snprintf(mode,sizeof mode,"Slice / %u",(unsigned)sam_slices);
-    ui_title(0,sam_layer?"Sampler / Layer":"Sampler",sam_loop==3?mode:sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
+    ui_title(0,sam_usb?(sam_layer?"USB / Layer":"Sampler / USB"):(sam_layer?"Sampler / Layer":"Sampler"),sam_loop==3?mode:sam_loop==2?"Loop latch":sam_loop?"Loop hold":"One shot");
     if(sam_state==SAM_CAPTURE) snprintf(status,sizeof status,"%s %u%%",sam_dubbing?"Layering":"Capturing",(unsigned)(sam_dubbing?sam_dub_pos*100u/sam_len:sam_len*100u/SAM_FRAMES));
     else if(ui_msg[0]) w_cpy(status,ui_msg,sizeof status);
     else if(sam_state==SAM_READY) snprintf(status,sizeof status,"Ready / %u ms",(unsigned)(sam_len*1000u/sam_rate()));
-    else w_cpy(status,"REC captures",sizeof status);
+    else w_cpy(status,sam_usb?(sam_usb_ready?"USB ready / REC":"Waiting for USB audio"):"REC captures",sizeof status);
     ui_row(1,40,28,status,quality[sam_state==SAM_CAPTURE || (sam_layer && sam_len>=64)?sam_rate_shift:sam_quality],sam_state==SAM_CAPTURE?K_CORAL:K_TEAL,K_DIM,K_BG);
     snprintf(d,sizeof d,"LIVE %u%%",(unsigned)sam_live_mix*100u/127u);
     ui_row(4,68,20,sam_layer?"EDIT / LAYER":"EDIT / REPLACE",sam_muted?"LIVE MUTED":d,K_DIM,sam_muted?K_CORAL:K_TEAL,K_BG);
@@ -480,7 +480,7 @@ static void ui_sampler(void)
     snprintf(d,sizeof d,"%u%%",(unsigned)(sam_level*200u/127u));
     ui_landscape(0);
     ui_knobs(labels,a,b,c,d);
-    ui_row(13,214,26,sam_loop==3?"PRESETS slices":"PRESETS Lo-fi","SAVE clip",K_DIM,K_DIM,K_PANEL);
+    ui_row(13,214,26,sam_loop==3?"PRESETS slices":"ENV source","SAVE clip",K_DIM,K_DIM,K_PANEL);
 }
 
 static void ui_filter(void)
@@ -653,6 +653,7 @@ void app_init(void)
 {
     /* Reserve the large stream buffers before WiFi's task allocations fragment the heap. */
     (void)radio_alloc();
+    (void)plat_usb_audio_init();
     screen_stop();
     sam_init(sample_bank);
     (void)sam_restore();
@@ -831,7 +832,10 @@ static void input(void)
             i+=presets;i=i<0?0:i>3?3:i;sam_slices=counts[i];sam_slice%=sam_slices;sam_voice=sam_gate=0;
         }
         if(algo) sam_muted=algo<0;
-        if(down&(1u<<B_ENV)) {sampler_open();ui_page_set(PG_SYNTH);return;}
+        if((down&(1u<<B_ENV)) && sam_state!=SAM_CAPTURE) {
+            if(!sam_usb && plat_usb_audio_init()) w_cpy(ui_msg,"USB memory low",sizeof ui_msg);
+            else {sam_usb=!sam_usb;ui_msg[0]=0;sam_monitor_level=0;}
+        }
         sam_knob(&sam_start,plat_enc(EN_K1));
         if(sam_start>125) sam_start=125;
         sam_knob(&sam_end,plat_enc(EN_K2));
@@ -845,8 +849,8 @@ static void input(void)
             if(sam_loop==0 || sam_loop==3) sam_voice=sam_gate=0;
         }
         if(down&(1u<<B_REC)) {
-            if(sam_state==SAM_CAPTURE || radio_st==RS_PLAYING) {ui_msg[0]=0;sam_record();}
-            else w_cpy(ui_msg,"Wait for PLAYING",sizeof ui_msg);
+            if(sam_state==SAM_CAPTURE || (sam_usb?sam_usb_ready:radio_st==RS_PLAYING)) {ui_msg[0]=0;sam_record();}
+            else w_cpy(ui_msg,sam_usb?"Send USB audio first":"Wait for PLAYING",sizeof ui_msg);
         }
         if(down&(1u<<B_SAVE)) {
             int rc;sam_finish();rc=sam_save();
@@ -877,6 +881,7 @@ void app_input_only(void) { input(); }
 int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const char *d)
 {
     (void)a;(void)b;(void)c;(void)d;
+    if(!strcmp(cmd,"usb_audio")) {host_usb_audio=atoi(a)!=0;return 1;}
     if(!strcmp(cmd,"splash")) {app_splash();return 1;}
     if(!strcmp(cmd,"screen_mem")) {host_screen_available=(uint32_t)atoi(a);return 1;}
     if(!strcmp(cmd,"screen")) {
@@ -899,6 +904,8 @@ int app_expect(const char *what, int *got)       /* the host simulator's checks 
     else if (!strcmp(what,"sam_dub_pos")) *got=(int)sam_dub_pos;
     else if (!strcmp(what,"sam_quality")) *got=sam_quality;
     else if (!strcmp(what,"sam_rate")) *got=(int)sam_rate();
+    else if (!strcmp(what,"sam_usb")) *got=sam_usb;
+    else if (!strcmp(what,"sam_usb_ready")) *got=sam_usb_ready;
     else if (!strcmp(what,"sam_live_mix")) *got=sam_live_mix;
     else if (!strcmp(what,"sam_slices")) *got=sam_slices;
     else if (!strcmp(what,"fil_on")) *got=fil_seen && fil_on;

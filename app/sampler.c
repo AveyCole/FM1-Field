@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-/* One 8/4/2 kHz mono IMA ADPCM clip in the former 12 KiB FX buffer.
+/* One 16/8/4/2 kHz mono IMA ADPCM clip in the reclaimed 24 KiB FX buffer.
  * Independent 64-sample blocks support pitched playback with a tiny cache. */
 #define SAM_BYTES 24576u
 #define SAM_BLOCK 36u
@@ -8,7 +8,7 @@
 enum {SAM_EMPTY,SAM_CAPTURE,SAM_READY};
 static uint8_t *sam_data;
 static volatile uint8_t sam_active,sam_state,sam_voice,sam_gate;
-static volatile uint8_t sam_muted;
+static volatile uint8_t sam_muted,sam_usb,sam_usb_ready;
 static uint8_t sam_quality=1,sam_rate_shift=1,sam_live_mix=127;
 static unsigned sam_rate(void) {return SAM_RATE>>sam_rate_shift;}
 static uint8_t sam_layer,sam_dubbing,sam_dub_fresh,sam_dub_block[SAM_BLOCK];
@@ -70,7 +70,7 @@ static int sam_sample(unsigned pos)
 static void sam_init(void *buffer)
 {
  sam_data=buffer;sam_state=SAM_EMPTY;sam_len=0;sam_voice=sam_gate=0;sam_active=0;
- sam_muted=0;sam_monitor_level=1;sam_slices=27;
+ sam_muted=sam_usb=sam_usb_ready=0;sam_monitor_level=1;sam_slices=27;
  sam_layer=sam_dubbing=0;sam_dub_pos=0;sam_dub_old=sam_dub_monitor=0;
  sam_quality=sam_rate_shift=1;sam_live_mix=127;
 }

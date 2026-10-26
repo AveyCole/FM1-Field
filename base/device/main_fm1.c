@@ -63,7 +63,7 @@ static void render_block(int32_t *o)                /* ALNK0: one half, measured
             }
             if (radio_quiet)
                 continue;
-#if FELUCCA_UAC_OUT
+#if FELUCCA_UAC_OUT && !defined(APP_USB_AUDIO_CAPTURE)
             uac_play(o + 2u * k, REND_FRAMES, full ? 4096u : master_pos * master_pos >> 12);   /* the computer's audio,
                                                                                          * at MASTER */
 #endif

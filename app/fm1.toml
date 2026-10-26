@@ -5,7 +5,7 @@ usb_manufacturer = "FIELD"
 usb_product = "FIELD"
 wifi = true                    # WiFi (fm1-base's); no Bluetooth in the same build
 usb_audio_in = true            # the FM-1 as a USB sound card: the computer records Radio over the cable
-usb_audio_out = false
+usb_audio_out = true           # computer/phone USB playback available to the sampler
 words = "words.tsv"
 # MP3 only: reclaimed the AAC arena for streaming reserve.
 o2 = []

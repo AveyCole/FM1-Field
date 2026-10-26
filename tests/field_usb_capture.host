@@ -1,0 +1,68 @@
+wait 6000
+tap ARP
+expect sam_usb 0
+tap ENV
+expect sam_usb 1
+expect sam_usb_ready 0
+tap REC
+expect sam_state 0
+usb_audio 1
+wait 30
+expect sam_usb_ready 1
+turn ALGO -1
+wait 30
+peakreset
+wait 30
+expect peak_db_max -120
+tap REC
+wait 1000
+expect sam_state 1
+expect sam_len >7900
+tap ENV
+expect sam_usb 1
+usb_audio 0
+wait 30
+expect sam_usb_ready 0
+expect sam_len <10000
+wait 500
+expect sam_len <10000
+usb_audio 1
+wait 100
+tap REC
+expect sam_state 2
+expect sam_len >8700
+peakreset
+tap PLAY
+wait 100
+expect peak_db_min -65
+tap PLAY
+shot field-usb-sampler.png
+tap EDIT
+tap REC
+wait 200
+expect sam_dubbing 1
+tap SAVE
+expect sam_state 2
+expect sam_len >8700
+tap HOME
+expect sam_active 0
+expect sam_usb 1
+reboot
+wait 6000
+tap ARP
+expect sam_usb 0
+expect sam_state 2
+expect sam_len >8700
+tap ENV
+expect sam_usb 1
+wait 25000
+turn PRESET 2
+tap REC
+wait 23000
+expect sam_state 2
+expect sam_rate 2000
+expect sam_len 43648
+tap ENV
+expect sam_usb 0
+tap LFO
+expect page 10

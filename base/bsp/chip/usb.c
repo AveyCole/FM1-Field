@@ -151,16 +151,31 @@ static struct {
 } uac;
 #if FELUCCA_UAC_OUT
 /* USB audio output: the packets in a ring (16-bit L | R << 16), read by uac_play at the I2S clock */
-#define UO_N 2048u               /* frames; a power of two */
+#ifndef FELUCCA_UO_N
+#define FELUCCA_UO_N 2048u
+#endif
+#ifndef FELUCCA_UO_TGT
+#define FELUCCA_UO_TGT (2u * HALF_FRAMES)
+#endif
+#ifndef FELUCCA_UO_RING_ATTR
+#define FELUCCA_UO_RING_ATTR
+#endif
+#define UO_N FELUCCA_UO_N               /* frames; a power of two */
 #define UO_MAXF 49u              /* frames in the largest packet the host may send (44.1: 44 or 45) */
 #define UO_MAXP (UO_MAXF * 4u)
-#define UO_TGT (2u * HALF_FRAMES)   /* the fill a render aims to start at: ~11.6 ms with 256-frame halves */
-static uint32_t uo_ring[UO_N];
+#define UO_TGT FELUCCA_UO_TGT   /* the fill a render aims to start at: ~11.6 ms with 256-frame halves */
+#if FELUCCA_UAC_CAPTURE
+static uint32_t *uo_ring; /* main-loop allocation; never allocate in an ISR */
+#else
+static uint32_t uo_ring[UO_N] FELUCCA_UO_RING_ATTR;
+#endif
+_Static_assert((UO_N & (UO_N-1u))==0 && UO_TGT>HALF_FRAMES+2u && UO_TGT<UO_N,"USB playback ring and target");
 static volatile uint32_t uo_w, uo_r;
 static uint32_t ep4rx[UO_MAXF + 1u] __attribute__((aligned(4)));
 static struct {
     volatile uint8_t alt;        /* the output's streaming interface: 1 = the host plays */
     uint8_t go;                  /* primed: uac_play reads the ring */
+    uint32_t step;               /* app capture: zero until a whole render can be read */
     uint32_t pos;                /* the read position's fraction, Q16 */
     float err;                   /* the fill's distance from UO_TGT, smoothed (frames) */
     uint32_t pkts, frames, underruns, overruns, starts;
@@ -552,7 +567,7 @@ static void uo_ep4_reset(void)                          /* EP4 OUT: isochronous,
 }
 static void uo_stream(uint32_t alt)                     /* SET_INTERFACE, configuration, bus reset */
 {
-    uo.go = 0;
+    uo.go = 0;uo.step=0;uo.pos=0;uo_r=uo_w; /* discard stale packets on a new interface */
     RING_PUBLISH();
     uo.alt = (uint8_t)alt;
     if (alt)
@@ -1403,7 +1418,11 @@ static void uo_service(void)                            /* an EP4 OUT packet int
     fm1_usb_rx_sync();
     w = uo_w;
     f = w - uo_r;
-    if (UO_N - f < n) {
+    if (
+#if FELUCCA_UAC_CAPTURE
+        !uo_ring ||
+#endif
+        UO_N - f < n) {
         uo.overruns++;                                  /* nobody plays it (or the rates part): drop */
     } else {
         for (i = 0; i < n; i++)
@@ -1421,6 +1440,9 @@ static void uo_service(void)                            /* an EP4 OUT packet int
 /* audio ISR, after the render: the computer's audio added to the block (24-bit, as the I2S takes it), at gain
  * gain_q12 (4096 = as sent), resampled from the ring: the read rate is 44.1 / 44.1176 kHz and steered by how far
  * the fill at a render's start is from UO_TGT (a frame's error: 1/32768 faster or slower) */
+#if FELUCCA_UAC_CAPTURE
+#include "usb_capture.c"
+#else
 static __attribute__((noinline)) void uac_play(int32_t *out, uint32_t n, uint32_t gain_q12)
 {
     uint32_t r = uo_r, fill = uo_w - r, i, pos = uo.pos, step;
@@ -1463,6 +1485,7 @@ static __attribute__((noinline)) void uac_play(int32_t *out, uint32_t n, uint32_
     uo_r = r + (pos >> 16);
     uo.pos = pos & 0xFFFFu;
 }
+#endif /* app capture / platform playback */
 #endif
 
 static void uac_service(void)

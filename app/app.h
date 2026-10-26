@@ -24,6 +24,8 @@ int app_host_cmd(const char *cmd,const char *a,const char *b,const char *c,const
 #define APP_BLOCK 256u
 #define APP_CANVAS_PX (240u * 44u)       /* strips, including the 42-row password keyboard */
 #define APP_BIG_FONT FONT_B             /* compact splash leaves flash for the offline region index */
+#define APP_USB_AUDIO_CAPTURE        /* app consumes USB playback before capture/filter/master */
+#define FM1B_UAC_OUT_FRAMES 512u       /* 2 KiB heap ring; no radio-buffer reduction */
 #define FM1B_UAC_RING_POOL 1             /* USB audio's ring in the pool: the RAM is full (fm1-base unity.c) */
 #define APP_WIFI_TX_RATES 0x7FFu          /* WiFi sends at 1 .. 18M and MCS0-2 (21.7M) only: the fast rates fail at
                                          * the FM-1's range (-75 dBm and under), and a stream needs < 1M */

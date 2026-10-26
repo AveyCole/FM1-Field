@@ -5,13 +5,13 @@ Browse the world, choose a country or state/province, and listen through a stati
 
 **[Open the website](https://aveycole.github.io/FM1-Field/) ·
 [USB web installer](https://aveycole.github.io/FM1-Field/install/) ·
-[Download 0.1.17-alpha](docs/firmware/field-0.1.17-alpha.fwsc)**
+[Download 0.1.18-alpha](docs/firmware/field-0.1.18-alpha.fwsc)**
 
 ## Status
 
 This is experimental firmware. The original alpha was reported working on an FM-1,
 and the playback-buffer update was reported to improve cutouts substantially.
-The 0.1.17 update replaces the Delay/Reverb and held-key effects with one larger sampler: 2.728 seconds at 16 kHz, 5.456 seconds at 8 kHz, 10.912 seconds at 4 kHz, or 21.824 seconds at 2 kHz. It adds a continuous live-mix knob, louder sample/output gain with peak limiting, and persistent location caches to avoid full index scans on every boot. The LFO filter stays. Software checks pass; physical-device testing is still needed.
+0.1.18 adds USB audio sampling. In the sampler, press ENV to choose Radio or USB; the header identifies USB. On your computer, choose FIELD as the audio output at 44.1 kHz, 16-bit stereo, then play audio and press REC. Incoming stereo is captured as mono. USB works with Replace, Layer overdubs, all four quality settings and SAVE. SELECT sets live mix and ALGORITHM mutes monitoring without stopping capture. Source changes are locked during recording; leaving the editor restores radio monitoring. The display mirror and existing sample/stream buffers remain. Software tests pass; physical-device USB testing is still needed.
 
 For installation, leave FIELD running normally; the web installer switches modes
 automatically. It also accepts a loader already on screen. Allow up to 45 seconds
@@ -43,7 +43,7 @@ The header shows a three-bar battery level, or `USB` when powered by an active U
 | ALGORITHM in ARP | Left mutes the live monitor; right restores it. Samples and capture remain available |
 | FX | Tap tempo for the retained LFO filter |
 | PRESETS on LFO | Set BPM, 40–240; header displays it |
-| ENV | Shortcut to the same sampler editor; preserves the clip |
+| ENV | Outside sampler: open editor. Inside sampler: toggle Radio / USB source while stopped; preserves the clip |
 | EDIT | Player: toggle Near. ARP: switch REPLACE / LAYER recording while stopped |
 
 In favorites, turn SELECT to move, then press SEL or PLAY to replay that exact recording.
@@ -61,9 +61,17 @@ pitch. PRESETS selects the count while in Slice mode; higher keys repeat the
 sequence when fewer than 27 slices are selected. It starts at 27 on boot.
 Changing the count stops the current sample voice and retains the clip.
 SEL cycles One shot → Loop hold → Loop latch → Slice → One shot. PLAY auditions/stops the clip. Leaving the sampler finishes capture without saving it.
-The live recording stays audible in ARP by default. Turn ALGORITHM left to mute
+The selected live input stays audible in ARP by default. Turn ALGORITHM left to mute
 its monitor and right to restore it at the chosen SELECT mix. This switch does not mute the sample or
 stop capture. A short fade avoids an abrupt gain change. Leaving the editor restores full live playback; the editor remembers its mix and mute until reboot.
+
+To capture **USB-C audio**, connect FIELD to a computer with a data cable and select **FIELD as the computer’s playback/output device** at **44.1 kHz, 16-bit stereo**. This uses USB device audio, not a USB-host connection to another USB peripheral. Send audio from the computer, open **ARP**, and press **ENV** until the header says **Sampler / USB**. Press **REC** to capture or **EDIT** for Layer, then REC to overdub. Stereo input is averaged to mono in the existing sample bank.
+
+USB capture works without WiFi. Incoming silence records normally; missing USB frames pause capture. The editor reports when USB audio is unavailable and refuses an empty start. Monitoring mix/mute does not affect capture. Source selection is locked while recording; stop with REC or SAVE before switching. Leaving the editor finishes capture and restores radio monitoring; the same sample remains playable on the keyboard. Source selection resets to Radio at boot; saved clips keep their audio and rate regardless of origin.
+
+The USB receive ring adds 2 KiB of heap, reserved before WiFi allocations. No sample, compressed-stream or PCM buffer is reduced. The optional USB display mirror remains available with its existing low-memory guard. The computer can still record FIELD’s output over USB; avoid routing that return back into FIELD unless an audio feedback loop is intended.
+
+![FIELD USB sampler](docs/images/field-usb.png)
 
 Press **SAVE in ARP** to store one clip, including trim, pitch/octave, level,
 playback mode, slice count and recorded rate. SAVE during capture finishes it early and saves.
@@ -172,10 +180,10 @@ Use Linux x86-64, Python with Pillow, JieLi's pi32v2 toolchain, and AC79 SDK
 ```sh
 python3 -m pip install Pillow
 AC79_SDK=/path/to/fw-AC79_AIoT_SDK JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.17-alpha
+  python3 base/tools/build.py app --release 0.1.18-alpha
 ```
 
-This produces `app/build/field-0.1.17-alpha.fwsc`. Platform setup is documented
+This produces `app/build/field-0.1.18-alpha.fwsc`. Platform setup is documented
 in [the upstream README](UPSTREAM-README.md) and [base](base/README.md).
 The generated region catalogue is included; Shapely/NumPy and the boundary source
 are needed only when rebuilding that catalogue.

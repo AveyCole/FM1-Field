@@ -508,6 +508,15 @@ int plat_host_read(uint32_t addr, uint8_t *dst, uint32_t n) { (void)addr, (void)
 void plat_host_patience(uint32_t try_ms, uint32_t total_ms) { (void)try_ms, (void)total_ms; }
 static int uac_full;                            /* plat_usb_audio_full: the render at full level, MASTER after it */
 void plat_usb_audio_full(int on) { uac_full = on != 0; }
+/* Explicit simulated USB source; no host sound device is accessed. */
+static int host_usb_audio;static uint32_t host_usb_frame;
+int plat_usb_audio_init(void) {return 0;}
+void plat_usb_audio_begin(uint32_t n) {(void)n;}
+int plat_usb_audio_read(float *l,float *r)
+{
+    if(!host_usb_audio) {*l=*r=0;return 0;}
+    *l=0.25f*sinf((float)(host_usb_frame++%44100u)*(6.28318530718f*220.0f/44100.0f));*r=*l;return 1;
+}
 
 /* flash: one buffer per object, kept across a simulated reboot */
 static uint8_t store[OBJ_NOBJ][PLAT_STORE_MAX];

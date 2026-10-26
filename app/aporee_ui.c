@@ -67,7 +67,7 @@ static void ap_near_leave(void)
 }
 static void ap_shuffle(void)
 {
-    sam_finish();
+    if(!(sam_active && sam_usb)) sam_finish();
     ap_recalled=0;
     ap_pending = 1; ap_retry = plat_ms(); radio_want = 1;
     if (wifi_st == WS_OFF) wifi_power(1);
@@ -77,7 +77,7 @@ static void sel_turn(int level, int32_t d) { if (level == 3 && d) ap_shuffle(); 
 static void radio_toggle(void)
 {
     radio_want = !radio_want;
-    if (!radio_want) {sam_finish();radio_stop();}
+    if (!radio_want) {if(!(sam_active && sam_usb)) sam_finish();radio_stop();}
     else { if (wifi_st == WS_OFF) wifi_power(1); if (!play_url[0]) ap_pending = 1; }
     ap_remember();
 }

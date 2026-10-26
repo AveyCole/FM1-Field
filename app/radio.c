@@ -362,6 +362,8 @@ static void radio_render(int32_t *o, uint32_t n)
                                                    * same at the top, half way -12 dB, not -6; linear, broadcast
                                                    * audio near 0 dBFS was loud over most of its travel) */
     uint32_t step = radio_step, w = pcm_w;
+    int usb_source=sam_active && sam_usb,usb_ready=0;
+    plat_usb_audio_begin(n);
     for (i = 0; i < n; i++) {
         float l = 0.0f, rr = 0.0f;
         int fresh=playing && r!=w;
@@ -379,6 +381,8 @@ static void radio_render(int32_t *o, uint32_t n)
         } else if (playing) {
             radio_underruns++;
         }
+        {float ul,ur;int uf=plat_usb_audio_read(&ul,&ur);usb_ready|=uf;
+         if(usb_source) {l=ul;rr=ur;fresh=uf;}}
         sam_capture(l,rr,fresh);
         sam_monitor(&l,&rr);                     /* monitoring only: capture still receives the live source */
 
@@ -389,7 +393,7 @@ static void radio_render(int32_t *o, uint32_t n)
         o[2u * i] = (int32_t)(l * gain);
         o[2u * i + 1u] = (int32_t)(rr * gain);
     }
-    pcm_r = r;
+    pcm_r = r;sam_usb_ready=(uint8_t)usb_ready;
 }
 
 static const char *radio_status_str(void)

@@ -181,6 +181,11 @@ void plat_host_patience(uint32_t try_ms, uint32_t total_ms);   /* each try's wai
 /* USB audio full (FM1B_UAC): 1, the USB audio input at full level (the app's render at gain 4096), MASTER for the
  * speaker and headphones only; 0, both at MASTER (the default) */
 void plat_usb_audio_full(int on);
+/* App-owned USB playback route: begin once per render, read unscaled stereo
+ * frames. Read returns 0 and silence while disconnected/priming/underrun. */
+int plat_usb_audio_init(void); /* main loop: reserve receive storage; 0 success */
+void plat_usb_audio_begin(uint32_t frames);
+int plat_usb_audio_read(float *l,float *r);
 
 /* the keys' velocity and pressure (an app with APP_KEY_SENSE): on, the scan reads the keys on the analog rows and
  * hands each reading to the app (app_key_sample, app_key_probe); off by default */

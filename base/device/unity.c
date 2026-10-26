@@ -86,6 +86,12 @@ static volatile uint32_t fm1_ms;  /* milliseconds since boot (TIMER4-based, TIME
 #define FM1B_UAC_OUT 1            /* the computer plays through the FM-1 (USB audio output) */
 #endif
 #define FELUCCA_UAC_OUT FM1B_UAC_OUT
+#ifdef APP_USB_AUDIO_CAPTURE
+#define FELUCCA_UAC_CAPTURE 1
+#define FELUCCA_UO_N FM1B_UAC_OUT_FRAMES
+#define FELUCCA_UO_TGT (3u * HALF_FRAMES / 2u)
+#define FELUCCA_UO_RING_ATTR PLAT_POOL /* default route only; capture ring is allocated on the heap */
+#endif
 #ifndef FM1B_UAC_DEEP
 #define FM1B_UAC_DEEP 0           /* 1: the USB audio input holds a half more (renders past ~40 % of their time
                                    * otherwise run its ring dry: holds in the recording); its 4 KB ring in the pool */

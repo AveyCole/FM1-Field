@@ -1,4 +1,4 @@
-# FIELD — experimental 0.1.17-alpha
+# FIELD — experimental 0.1.18-alpha
 
 A standalone field-recording firmware for the M-VAVE FM-1, derived from
 Charles Vestal's fm1-radio and its pinned fm1-base / felucca-bsp platform.
@@ -124,7 +124,7 @@ Linux x86-64, Python with Pillow, JieLi pi32v2 toolchain, and AC79 SDK tag
 
 ```sh
 AC79_SDK=/path/to/sdk JIELI_TOOLCHAIN=/path/to/toolchain \
-  python3 base/tools/build.py app --release 0.1.17-alpha
+  python3 base/tools/build.py app --release 0.1.18-alpha
 python3 base/tools/build.py app --host
 mkdir -p app/build/ui-check
 app/build/host/field_host tests/aporee.host app/build/ui-check
@@ -734,3 +734,44 @@ retention/eviction, redundant-write avoidance and isolation from sample banks.
 Simulator navigation, filter, display mirror and installer validation pass.
 Loader tests preserve saved clip and cache areas through update/reinstall.
 Hardware checks: image 575152 B; RAM .data+.bss 130720 B of 131072; pool 308772 B of 311296. Real-device testing remains necessary.
+
+
+## USB audio capture source (0.1.18)
+
+USB playback reception is enabled: UAC1 EP4 OUT, 44.1 kHz / 16-bit stereo.
+Inside the sampler ENV toggles Radio/USB while stopped; elsewhere ENV opens
+the editor as before. The USB-labelled header and waiting/ready status identify
+the source. REC requires fresh USB audio when selected. Replace, Layer, quality,
+trim, pitch, slices, latch and one-slot SAVE work through the existing mono
+ADPCM path. Radio remains the default after reboot; clip format is unchanged.
+
+The app owns the playback route, before dry capture, monitor gain, filter and
+MASTER. Platform post-render USB mixing is disabled for this app to avoid
+double monitoring and bypassing mute/filter. Each render primes a fill-steered
+resampler; per-frame reads return normalized stereo and a validity bit. No
+block-sized scratch buffer is allocated. Missing frames return silence/false,
+pausing capture; valid zero samples still record. The receive engine drains
+even while Radio is selected to avoid stale queued audio. Interface changes
+flush the ring and require re-priming. Capture source changes are locked while
+recording, and entering USB fades the monitor in. Leaving the editor restores
+Radio; network track completion/shuffling does not finish an active USB capture.
+
+The existing platform USB receive engine uses a smaller 512-frame / 2 KiB heap
+ring, target 384 frames. Main-loop initialization reserves it after the large
+radio buffers, before WiFi task allocations. Allocation failure is handled
+without dereferencing a null ring; selecting USB can retry and reports failure.
+The app retains the full 24 KiB sample bank, 80 KiB compressed stream ring and
+PCM capacity. The pixel mirror stays, with its normal heap-reserve check.
+No USB host or direct USB audio-peripheral connection is implemented: select
+FIELD as a computer's playback device and send audio to it. Hardware USB audio
+reliability still requires testing, including simultaneous WiFi and MIDI.
+
+Tests simulate 116 seconds of USB packet/physical-clock drift through the actual
+resampler: 75.1 dB stereo interpolation SNR and no ring overruns/underruns in the
+continuous case. Separate cases verify empty allocation, priming, stalled input,
+valid silence and disconnect. Host controls verify unavailable-input refusal,
+muted USB capture with audible sample replay, stalled-capture pause, recording
+source lock, USB overdub/SAVE/reboot and a full 21.824-second capture across a
+network track ending. All earlier sampler, cache, filter and pixel-mirror tests
+pass. Both inline installer pages validate the new package and identity.
+Hardware checks: image 576496 B; RAM .data+.bss 130976 B of 131072; pool 308772 B of 311296. Real-device USB testing remains necessary.
