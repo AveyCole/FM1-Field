@@ -218,3 +218,5 @@ all notices are retained in [LICENSING.md](LICENSING.md) and `LICENSES/`.
 Recordings come from [Radio Aporee](https://aporee.org/maps/) and retain their
 contributors' individual licences. Geography is made with Natural Earth (public domain).
 FIELD is independent of, and not endorsed by, Radio Aporee or M-VAVE.
+
+You can also try FM-1 Field in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
